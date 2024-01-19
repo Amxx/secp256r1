@@ -12,9 +12,6 @@
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.3",
     "@nomicfoundation/hardhat-ethers": "^3.0.5",
     "chai": "^4.4.1",
-    "crypto": "^1.0.1",
-    "ec-pem": "^0.18.0",
-    "ethereumjs-util": "^7.1.5",
     "ethers": "^6.10.0",
     "hardhat": "^2.19.4"
   }

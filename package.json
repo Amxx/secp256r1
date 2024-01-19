@@ -1,0 +1,17 @@
+{
+  "name": "secp256r1",
+  "version": "1.0.0",
+  "author": "Hadrien Croubois (@Amxx)",
+  "license": "MIT",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.3",
+    "@nomicfoundation/hardhat-ethers": "^3.0.5",
+    "chai": "^4.4.1",
+    "ethers": "^6.10.0",
+    "hardhat": "^2.19.4"
+  }
+}

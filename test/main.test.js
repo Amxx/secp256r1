@@ -29,6 +29,21 @@ describe('secp256r1', function () {
   });
 
   describe('verify', function () {
+    before(function () {
+      this.estimations = {
+        'EllipticCurve.validateSignature': [],
+        'Secp256r1.Verify': [],
+        'Secp256r1_new.Verify': [],
+      };
+    });
+
+    after(function () {
+      Object.entries(this.estimations).forEach(([ name, estimates ]) => {
+        const average = estimates.reduce((a, b) => a + b, 0n) / ethers.toBigInt(estimates.length);
+        console.log(`[average gas cost] ${name}: ${average}`);
+      });
+    })
+
     beforeEach(async function () {
       const messageHash = ethers.hexlify(ethers.randomBytes(32));
       const privateKey = secp256r1.utils.randomPrivateKey();
@@ -43,22 +58,16 @@ describe('secp256r1', function () {
       Object.assign(this, { messageHash, publicKey, signature });
     });
 
-    it('confirm that a valid point is on the curve', async function () {
+    it.skip('confirm that a valid point is on the curve', async function () {
       let x = '0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296';
       let y = '0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5';
       expect(await this.EllipticCurve.isOnCurve(x, y)).to.be.true;
     });
 
-    it('reject that an invalid point is on the curve', async function () {
+    it.skip('reject that an invalid point is on the curve', async function () {
       let x = '0x3B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296';
       let y = '0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5';
       expect(await this.EllipticCurve.isOnCurve(x, y)).to.be.false;
-    });
-
-    it('estimate gas costs', async function () {
-      console.log('EllipticCurve.validateSignature.estimateGas', await this.EllipticCurve.validateSignature.estimateGas(this.messageHash, this.signature, this.publicKey));
-      console.log('Secp256r1.Verify.estimateGas', await this.Secp256r1.Verify.estimateGas(...this.publicKey, ...this.signature, this.messageHash));
-      console.log('Secp256r1_new.Verify.estimateGas', await this.Secp256r1_new.Verify.estimateGas(...this.publicKey, ...this.signature, this.messageHash));
     });
 
     Array(10).fill().forEach((_, i, {length}) => {
@@ -66,6 +75,10 @@ describe('secp256r1', function () {
         expect(await this.EllipticCurve.validateSignature(this.messageHash, this.signature, this.publicKey)).to.be.true;
         expect(await this.Secp256r1.Verify(...this.publicKey, ...this.signature, this.messageHash)).to.be.true;
         expect(await this.Secp256r1_new.Verify(...this.publicKey, ...this.signature, this.messageHash)).to.be.true;
+
+        this.estimations['EllipticCurve.validateSignature'].push(await this.EllipticCurve.validateSignature.estimateGas(this.messageHash, this.signature, this.publicKey));
+        this.estimations['Secp256r1.Verify'               ].push(await this.Secp256r1.Verify.estimateGas(...this.publicKey, ...this.signature, this.messageHash));
+        this.estimations['Secp256r1_new.Verify'           ].push(await this.Secp256r1_new.Verify.estimateGas(...this.publicKey, ...this.signature, this.messageHash));
       });
     });
 

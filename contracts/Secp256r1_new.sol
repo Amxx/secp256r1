@@ -12,25 +12,20 @@ library Math {
    * If the input values is not inversible, 0 is returned.
    */
   function inv(uint256 a, uint256 p) internal pure returns (uint256) {
-    if (p == 0) return 0;
-    uint256 r1 = a % p;
-    if (r1 == 0) return 0;
-    uint256 r2 = p;
-    uint256 t1 = 0;
-    uint256 t2 = 1;
     unchecked {
+      if (p == 0) return 0;
+      uint256 r1 = a % p;
+      if (r1 == 0) return 0;
+      uint256 r2 = p;
+      int256 t1 = 0;
+      int256 t2 = 1;
       while (r1 != 0) {
         uint256 q = r2 / r1;
-        (t1, t2, r2, r1) = (
-          t2,
-          addmod(t1, uint256(p - mulmod(t2, q, p)), p),
-          r1,
-          addmod(r2, uint256(p - mulmod(r1, q, p)), p)
-        );
+        (t1, t2, r2, r1) = (t2, t1 - t2 * int256(q), r1, r2 - r1 * q);
       }
+      if (r2 != 1) return 0;
+      return t1 < 0 ? (p - uint256(-t1)) : uint256(t1);
     }
-    if (r2 != 1) return 0;
-    return t1;
   }
 }
 
@@ -40,13 +35,13 @@ library Math {
  * and optimized for solidity ^0.8.0.
  */
 contract Secp256r1_new {
-  uint256 constant gx = 0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296;
-  uint256 constant gy = 0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5;
-  uint256 constant pp = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF;
-  uint256 constant nn = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551;
-  uint256 constant a  = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC;
-  uint256 constant b  = 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B;
-  uint256 constant ss = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0;
+  uint256 public constant gx = 0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296;
+  uint256 public constant gy = 0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5;
+  uint256 public constant pp = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF;
+  uint256 public constant nn = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551;
+  uint256 public constant a  = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC;
+  uint256 public constant b  = 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B;
+  uint256 public constant ss = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0;
 
   /**
     * @dev signature verification
@@ -61,8 +56,7 @@ contract Secp256r1_new {
     // if (R >= nn || S >= ss) return false; // TODO: find out why this causes issues
 
     uint256 e = uint256(input);
-    // uint256 w = Math.inv(S, nn); // this is apparently much more expensive :/
-    uint256 w = _invmod(S, nn);
+    uint256 w = Math.inv(S, nn);
     uint256 u1 = mulmod(e, w, nn);
     uint256 u2 = mulmod(R, w, nn);
     (uint256 x1, uint256 y1) = ScalarMult(gx, gy, u1);
@@ -104,8 +98,7 @@ contract Secp256r1_new {
     */
   function _affineFromJacobian(uint256 x, uint256 y, uint256 z) public pure returns(uint256 ax, uint256 ay) {
     if (z == 0) return (0, 0);
-    // uint256 zinv = Math.inv(z, pp); // this is apparently much more expensive :/
-    uint256 zinv = _invmod(z, pp);
+    uint256 zinv = Math.inv(z, pp);
     uint256 zinvsq = mulmod(zinv, zinv, pp);
     uint256 zinvcb = mulmod(zinvsq, zinv, pp);
     ax = mulmod(x, zinvsq, pp);
@@ -228,30 +221,6 @@ contract Secp256r1_new {
         q2 := add(pd, q2)
       }
       q2 := sub(q2, gamma) // Y3 = alpha*(4*beta-X3)-8*gamma^2
-    }
-  }
-
-  /**
-    * @dev returns the inverse of an integer
-    */
-  function _invmod(uint256 value, uint256 p) public pure returns (uint256) {
-    unchecked {
-      assert(value != 0 || value != p || p != 0);
-
-      int256 t1;
-      int256 t2 = 1;
-      uint256 r1 = p;
-      uint256 r2 = value % p;
-      uint256 q;
-
-      while (r2 != 0) {
-        q = r1 / r2;
-        (t1, t2, r1, r2) = (t2, t1 - int256(q) * t2, r2, r1 - q * r2);
-      }
-
-      return t1 < 0
-        ? (p - uint256(-t1))
-        : uint256(t1);
     }
   }
 }

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract Secp256r1_v8 {
+import "hardhat/console.sol";
+
+contract Secp256r1_new {
     uint256 constant gx = 0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296;
     uint256 constant gy = 0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5;
     uint256 constant pp = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF;
@@ -48,8 +50,8 @@ contract Secp256r1_v8 {
     function scalarMultiplications(uint256 X, uint256 Y, uint256 u1, uint256 u2)
         public pure returns(uint256, uint256)
     {
-        (uint256 x1, uint256 y1) = ScalarBaseMult(toBytes(u1));
-        (uint256 x2, uint256 y2) = ScalarMult(X, Y, toBytes(u2));
+        (uint256 x1, uint256 y1) = ScalarMult(gx, gy, u1);
+        (uint256 x2, uint256 y2) = ScalarMult(X, Y, u2);
         return Add(x1, y1, x2, y2);
     }
 
@@ -74,7 +76,7 @@ contract Secp256r1_v8 {
     * @description performs scalar multiplication of two elliptic curve points, based on golang
     * crypto/elliptic library
     */
-    function ScalarMult(uint256 Bx, uint256 By, bytes memory k)
+    function ScalarMult(uint256 Bx, uint256 By, uint256 k)
         public pure returns (uint256, uint256)
     {
         uint256 Bz = 1;
@@ -82,30 +84,15 @@ contract Secp256r1_v8 {
         uint256 y = 0;
         uint256 z = 0;
 
-        for (uint256 i = 0; i < k.length; i++) {
-            for (uint256 bn = 0; bn < 8; bn++) {
-                (x, y, z) = _jDouble(x, y, z);
-                if ((k[i] & 0x80) == 0x80) {
-                    (x, y, z) = _jAdd(Bx, By, Bz, x, y, z);
-                }
-                k[i] = k[i] << 1;
+        for (uint256 i = 0; i < 256; ++i) {
+            (x, y, z) = _jDouble(x, y, z);
+            if ((k >> (255 - i)) & 0x1 == 0x1) {
+                (x, y, z) = _jAdd(Bx, By, Bz, x, y, z);
             }
         }
 
         return _affineFromJacobian(x, y, z);
     }
-
-    /*
-    * ScalarBaseMult
-    * @description performs scalar multiplication of two elliptic curve points, based on golang
-    * crypto/elliptic library
-    */
-    function ScalarBaseMult(bytes memory k)
-        public pure returns (uint256, uint256)
-    {
-        return ScalarMult(gx, gy, k);
-    }
-
 
     /* _affineFromJacobian
     * @desription returns affine coordinates from a jacobian input follows
@@ -114,17 +101,14 @@ contract Secp256r1_v8 {
     function _affineFromJacobian(uint256 x, uint256 y, uint256 z)
         public pure returns(uint256 ax, uint256 ay)
     {
-        if (z==0) {
-            return (0, 0);
-        }
-
+        if (z == 0) return (0, 0);
         uint256 zinv = _invmod(z, pp);
         uint256 zinvsq = mulmod(zinv, zinv, pp);
-
+        uint256 zinvcb = mulmod(zinvsq, zinv, pp);
         ax = mulmod(x, zinvsq, pp);
-        ay = mulmod(y, mulmod(zinvsq, zinv, pp), pp);
-
+        ay = mulmod(y, zinvcb, pp);
     }
+
     /*
     * _jAdd
     * @description performs double Jacobian as defined below:
@@ -134,20 +118,11 @@ contract Secp256r1_v8 {
         public pure returns(uint256 r1, uint256 r2, uint256 r3)
     {
         if (p3 == 0) {
-            r1 = q1;
-            r2 = q2;
-            r3 = q3;
-
-            return (r1, r2, r3);
-
-        } else if (q3 == 0) {
-            r1 = p1;
-            r2 = p2;
-            r3 = p3;
-
-            return (r1, r2, r3);
+            return (q1, q2, q3);
         }
-
+        if (q3 == 0) {
+            return (p1, p2, p3);
+        }
         assembly {
             let pd := pp
             let z1z1 := mulmod(p3, p3, pd) // Z1Z1 = Z1^2
@@ -257,15 +232,6 @@ contract Secp256r1_v8 {
             }
             q2 := sub(q2, gamma) // Y3 = alpha*(4*beta-X3)-8*gamma^2
         }
-    }
-
-    function toBytes(uint256 input) internal pure returns (bytes memory out) {
-        out = new bytes(32);
-        assembly {
-            mstore(add(out, 32), input)
-        }
-
-        return out;
     }
 
     /*

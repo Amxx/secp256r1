@@ -55,14 +55,18 @@ describe('secp256r1', function () {
       expect(await this.EllipticCurve.isOnCurve(x, y)).to.be.false;
     });
 
-    it('confirm valid signature', async function () {
-      expect(await this.EllipticCurve.validateSignature(this.messageHash, this.signature, this.publicKey)).to.be.true;
-      expect(await this.Secp256r1.Verify(...this.publicKey, ...this.signature, this.messageHash)).to.be.true;
-      expect(await this.Secp256r1_new.Verify(...this.publicKey, ...this.signature, this.messageHash)).to.be.true;
-
+    it('estimate gas costs', async function () {
       console.log('EllipticCurve.validateSignature.estimateGas', await this.EllipticCurve.validateSignature.estimateGas(this.messageHash, this.signature, this.publicKey));
       console.log('Secp256r1.Verify.estimateGas', await this.Secp256r1.Verify.estimateGas(...this.publicKey, ...this.signature, this.messageHash));
       console.log('Secp256r1_new.Verify.estimateGas', await this.Secp256r1_new.Verify.estimateGas(...this.publicKey, ...this.signature, this.messageHash));
+    });
+
+    Array(10).fill().forEach((_, i, {length}) => {
+      it(`confirm valid signature (run ${i + 1}/${length})`, async function () {
+        expect(await this.EllipticCurve.validateSignature(this.messageHash, this.signature, this.publicKey)).to.be.true;
+        expect(await this.Secp256r1.Verify(...this.publicKey, ...this.signature, this.messageHash)).to.be.true;
+        expect(await this.Secp256r1_new.Verify(...this.publicKey, ...this.signature, this.messageHash)).to.be.true;
+      });
     });
 
     it('reject signature with flipped public key coordinates ([x,y] >> [y,x])', async function () {

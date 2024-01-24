@@ -4,8 +4,8 @@ const { secp256r1 } = require('@noble/curves/p256');
 const { loadFixture } = require('@nomicfoundation/hardhat-network-helpers');
 
 const names = [
+  '$P256',
   'Secp256r1',
-  'Secp256r1_new',
   'EllipticCurve',
 ];
 
@@ -33,7 +33,7 @@ describe('secp256r1', function () {
       this.estimations = {
         'EllipticCurve.validateSignature': [],
         'Secp256r1.Verify': [],
-        'Secp256r1_new.Verify': [],
+        'P256.verify': [],
       };
     });
 
@@ -71,18 +71,18 @@ describe('secp256r1', function () {
     });
 
     it('derivate public from private', async function () {
-      expect(await this.Secp256r1_new.getPublicKey(ethers.toBigInt(this.privateKey))).to.deep.equal(this.publicKey);
+      expect(await this.$P256.$getPublicKey(ethers.toBigInt(this.privateKey))).to.deep.equal(this.publicKey);
     });
 
     Array(10).fill().forEach((_, i, {length}) => {
       it(`confirm valid signature (run ${i + 1}/${length})`, async function () {
         expect(await this.EllipticCurve.validateSignature(this.messageHash, this.signature, this.publicKey)).to.be.true;
         expect(await this.Secp256r1.Verify(...this.publicKey, ...this.signature, this.messageHash)).to.be.true;
-        expect(await this.Secp256r1_new.Verify(...this.publicKey, ...this.signature, this.messageHash)).to.be.true;
+        expect(await this.$P256.$verify(...this.publicKey, ...this.signature, this.messageHash)).to.be.true;
 
         this.estimations['EllipticCurve.validateSignature'].push(await this.EllipticCurve.validateSignature.estimateGas(this.messageHash, this.signature, this.publicKey));
         this.estimations['Secp256r1.Verify'               ].push(await this.Secp256r1.Verify.estimateGas(...this.publicKey, ...this.signature, this.messageHash));
-        this.estimations['Secp256r1_new.Verify'           ].push(await this.Secp256r1_new.Verify.estimateGas(...this.publicKey, ...this.signature, this.messageHash));
+        this.estimations['P256.verify'                    ].push(await this.$P256.$verify.estimateGas(...this.publicKey, ...this.signature, this.messageHash));
       });
     });
 
@@ -90,21 +90,21 @@ describe('secp256r1', function () {
       this.publicKey.reverse();
       expect(await this.EllipticCurve.validateSignature(this.messageHash, this.signature, this.publicKey)).to.be.false;
       expect(await this.Secp256r1.Verify(...this.publicKey, ...this.signature, this.messageHash)).to.be.false;
-      expect(await this.Secp256r1_new.Verify(...this.publicKey, ...this.signature, this.messageHash)).to.be.false;
+      expect(await this.$P256.$verify(...this.publicKey, ...this.signature, this.messageHash)).to.be.false;
     });
 
     it('reject signature with flipped signature values ([r,s] >> [s,r])', async function () {
       this.signature.reverse();
       expect(await this.EllipticCurve.validateSignature(this.messageHash, this.signature, this.publicKey)).to.be.false;
       expect(await this.Secp256r1.Verify(...this.publicKey, ...this.signature, this.messageHash)).to.be.false;
-      expect(await this.Secp256r1_new.Verify(...this.publicKey, ...this.signature, this.messageHash)).to.be.false;
+      expect(await this.$P256.$verify(...this.publicKey, ...this.signature, this.messageHash)).to.be.false;
     });
 
     it('reject signature with invalid message hash', async function () {
       var invalidMessageHash = ethers.hexlify(ethers.randomBytes(32));
       expect(await this.EllipticCurve.validateSignature(invalidMessageHash, this.signature, this.publicKey)).to.be.false;
       expect(await this.Secp256r1.Verify(...this.publicKey, ...this.signature, invalidMessageHash)).to.be.false;
-      expect(await this.Secp256r1_new.Verify(...this.publicKey, ...this.signature, invalidMessageHash)).to.be.false;
+      expect(await this.$P256.$verify(...this.publicKey, ...this.signature, invalidMessageHash)).to.be.false;
     });
   });
 });

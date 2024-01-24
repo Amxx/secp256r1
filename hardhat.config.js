@@ -1,5 +1,6 @@
 require('@nomicfoundation/hardhat-chai-matchers');
 require('@nomicfoundation/hardhat-ethers');
+require('hardhat-exposed');
 
 module.exports = {
   solidity: {
@@ -10,5 +11,8 @@ module.exports = {
       { version: '0.5.17', settings: { optimizer: { enabled: true, runs: 200 }} },
       { version: '0.4.26', settings: { optimizer: { enabled: true, runs: 200 }} },
     ],
+  },
+  exposed: {
+    exclude: ['vendor/*'],
   },
 };

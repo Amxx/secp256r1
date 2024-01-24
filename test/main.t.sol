@@ -4,15 +4,15 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {Secp256r1_new} from "../contracts/Secp256r1_new.sol";
+import {P256} from "../contracts/P256.sol";
 
-contract Secp256r1Test is Test, Secp256r1_new {
+contract Secp256r1Test is Test {
     function testVerify(uint256 privateKey, bytes32 digest) public {
         // private key must be less than the secp256r1 curve order
-        privateKey = bound(privateKey, 1, nn - 1);
+        privateKey = bound(privateKey, 1, P256.nn - 1);
 
-        (uint256 x, uint256 y) = getPublicKey(privateKey);
+        (uint256 x, uint256 y) = P256.getPublicKey(privateKey);
         (bytes32 r, bytes32 s) = vm.signP256(privateKey, digest);
-        assertTrue(Verify(x, y, uint256(r), uint256(s), digest));
+        assertTrue(P256.verify(x, y, uint256(r), uint256(s), digest));
     }
 }

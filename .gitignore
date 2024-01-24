@@ -5,3 +5,5 @@ node_modules
 /cache
 /artifacts
 
+# Hardhat-exposed
+/contracts-exposed

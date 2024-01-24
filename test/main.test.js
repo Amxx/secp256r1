@@ -38,7 +38,7 @@ describe('secp256r1', function () {
     });
 
     after(function () {
-      Object.entries(this.estimations).forEach(([ name, estimates ]) => {
+      Object.entries(this.estimations).filter(([ name, estimates ]) => estimates.length).forEach(([ name, estimates ]) => {
         const average = estimates.reduce((a, b) => a + b, 0n) / ethers.toBigInt(estimates.length);
         console.log(`[average gas cost] ${name}: ${average}`);
       });
@@ -55,7 +55,7 @@ describe('secp256r1', function () {
       const { r, s } = secp256r1.sign(messageHash.replace(/0x/, ''), privateKey);
       const signature = [ r, s ].map(v => ethers.toBeHex(v, 32));
 
-      Object.assign(this, { messageHash, publicKey, signature });
+      Object.assign(this, { messageHash, privateKey, publicKey, signature });
     });
 
     it.skip('confirm that a valid point is on the curve', async function () {
@@ -68,6 +68,10 @@ describe('secp256r1', function () {
       let x = '0x3B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296';
       let y = '0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5';
       expect(await this.EllipticCurve.isOnCurve(x, y)).to.be.false;
+    });
+
+    it('derivate public from private', async function () {
+      expect(await this.Secp256r1_new.getPublicKey(ethers.toBigInt(this.privateKey))).to.deep.equal(this.publicKey);
     });
 
     Array(10).fill().forEach((_, i, {length}) => {

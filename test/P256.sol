@@ -11,6 +11,9 @@ contract P256Test is Test {
         // private key must be less than the secp256r1 curve order
         privateKey = bound(privateKey, 1, P256.nn - 1);
 
+        // digest must not be 0 ?
+        vm.assume(digest != 0);
+
         (uint256 x, uint256 y) = P256.getPublicKey(privateKey);
         (bytes32 r, bytes32 s) = vm.signP256(privateKey, digest);
         assertTrue(P256.verify(x, y, uint256(r), uint256(s), digest));

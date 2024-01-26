@@ -55,7 +55,7 @@ library P256 {
         // Reconstruct R from its x coordinate (r)
         uint256 Rx = r;
         uint256 Ry2 = addmod(mulmod(addmod(mulmod(Rx, Rx, pp), a, pp), Rx, pp), b, pp); // weierstrass equation y² = x³ + a.x + b
-        uint256 Ry = modExp(Ry2, (pp + 1) / 4, pp); // This formula for sqrt work because pp ≡ 3 (mod 4)
+        uint256 Ry = Math.modExp(Ry2, (pp + 1) / 4, pp); // This formula for sqrt work because pp ≡ 3 (mod 4)
         // TODO: require(mulmod(Ry, Ry, pp) == Ry2);
         if (Ry % 2 != v % 2) Ry = pp - Ry;
 

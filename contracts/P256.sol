@@ -35,8 +35,10 @@ library P256 {
 
         uint256 d = uint256(digest);
         uint256 w = Math.invMod(s, nn);
-        (uint256 x1, uint256 y1) = scalarMult(gx, gy, mulmod(d, w, nn));
-        (uint256 x2, uint256 y2) = scalarMult(px, py, mulmod(r, w, nn));
+        uint256 u1 = mulmod(d, w, nn);
+        uint256 u2 = mulmod(r, w, nn);
+        (uint256 x1, uint256 y1) = scalarMult(gx, gy, u1);
+        (uint256 x2, uint256 y2) = scalarMult(px, py, u2);
         (uint256 x, ) = add(x1, y1, x2, y2);
 
         return (x % pp == r);
@@ -50,21 +52,21 @@ library P256 {
      * @param digest - hashed message
      */
     function recovery(uint256 r, uint256 s, uint8 v, bytes32 digest) internal view returns (uint256, uint256) {
-        // TODO: require(v == 0 || v != 1);
+        // Should be s >= ss, but tolling generates signatures with points on both sides.
+        if (r >= nn || s >= nn || v > 1) return (0, 0);
 
-        // Reconstruct R from its x coordinate (r)
-        uint256 Rx = r;
-        uint256 Ry2 = addmod(mulmod(addmod(mulmod(Rx, Rx, pp), a, pp), Rx, pp), b, pp); // weierstrass equation y² = x³ + a.x + b
-        uint256 Ry = Math.modExp(Ry2, (pp + 1) / 4, pp); // This formula for sqrt work because pp ≡ 3 (mod 4)
-        // TODO: require(mulmod(Ry, Ry, pp) == Ry2);
-        if (Ry % 2 != v % 2) Ry = pp - Ry;
+        uint256 rx = r;
+        uint256 ry2 = addmod(mulmod(addmod(mulmod(rx, rx, pp), a, pp), rx, pp), b, pp); // weierstrass equation y² = x³ + a.x + b
+        uint256 ry = Math.modExp(ry2, (pp + 1) / 4, pp); // This formula for sqrt work because pp ≡ 3 (mod 4)
+        if (mulmod(ry, ry, pp) != ry2) return (0, 0);
+        if (ry % 2 != v % 2) ry = pp - ry;
 
-        // Rebuild public key
-        uint256 ir = Math.invMod(r, nn);
-        uint256 u1 = mulmod(nn - uint256(digest), ir, nn);
-        uint256 u2 = mulmod(s, ir, nn);
+        uint256 d = uint256(digest);
+        uint256 w = Math.invMod(r, nn);
+        uint256 u1 = mulmod(nn - d, w, nn);
+        uint256 u2 = mulmod(s, w, nn);
         (uint256 x1, uint256 y1) = scalarMult(gx, gy, u1);
-        (uint256 x2, uint256 y2) = scalarMult(Rx, Ry, u2);
+        (uint256 x2, uint256 y2) = scalarMult(rx, ry, u2);
         return add(x1, y1, x2, y2);
     }
 

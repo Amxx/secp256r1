@@ -11,6 +11,14 @@ library Math {
      * @dev Muldiv operation overflow.
      */
     error MathOverflowedMulDiv();
+    /**
+     * @dev Modulus zero in Mod Exp operation.
+     */
+    error MathModulusEqualsZero();
+    /**
+     * @dev Static call to Mod Exp precompile fails.
+     */
+    error MathModExpCannotBeCalculated();
 
     enum Rounding {
         Floor, // Toward negative infinity
@@ -274,6 +282,32 @@ library Math {
             return x < 0 ? (n - uint256(-x)) : uint256(x); // Wrap the result if it's negative.
         }
     }
+
+    /**
+     * @dev Returns the modular exponentiation of the specified base, exponent and modulus (b ** e % m)
+     *
+     * Requirements:
+     * - modulus can't be zero
+     * - result should be obtained successfully
+     */
+    function modExp(uint256 b, uint256 e, uint256 m) internal view returns (uint256) {
+        if (m == 0) {
+            revert MathModulusEqualsZero();
+        }
+        (bool success, bytes memory result) = (address(5).staticcall(abi.encode(32, 32, 32, b, e, m)));
+        if (!success) {
+            revert MathModExpCannotBeCalculated();
+        }
+        return abi.decode(result, (uint256));
+    }
+
+    // ================================ NOT implemented in @openzeppelin/contracts yes ================================
+    function sqrtMod(uint256 a, uint256 n) internal view returns (uint256) {
+        require(n % 4 == 3, 'Not supported yet');
+        uint256 r = modExp(a, (n + 1) / 4, n);
+        return mulmod(r, r, n) == a ? r : 0;
+    }
+    // ================================ NOT implemented in @openzeppelin/contracts yes ================================
 
     /**
      * @dev Returns the square root of a number. If the number is not a perfect square, the value is rounded

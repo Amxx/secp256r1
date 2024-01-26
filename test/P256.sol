@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {P256} from "../contracts/P256.sol";
 
-contract Secp256r1Test is Test {
+contract P256Test is Test {
     function testVerify(uint256 privateKey, bytes32 digest) public {
         // private key must be less than the secp256r1 curve order
         privateKey = bound(privateKey, 1, P256.nn - 1);

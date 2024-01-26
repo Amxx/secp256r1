@@ -23,25 +23,48 @@ library P256 {
 
     /**
      * @dev signature verification
-     * @param X - public key coordinate X
-     * @param Y - public key coordinate Y
-     * @param R - signature half R
-     * @param S - signature half S
+     * @param px - public key coordinate X
+     * @param py - public key coordinate Y
+     * @param r - signature half R
+     * @param s - signature half S
      * @param digest - hashed message
      */
-    function verify(uint256 X, uint256 Y, uint256 R, uint256 S, bytes32 digest) internal pure returns (bool) {
-        if (R >= nn || S >= nn) return false;
-        // if (R >= nn || S >= ss) return false; // TODO: find out why this causes issues
+    function verify(uint256 px, uint256 py, uint256 r, uint256 s, bytes32 digest) internal pure returns (bool) {
+        // Should be s >= ss, but tolling generates signatures with points on both sides.
+        if (r >= nn || s >= nn) return false;
 
-        uint256 e = uint256(digest);
-        uint256 w = Math.invMod(S, nn);
-        uint256 u1 = mulmod(e, w, nn);
-        uint256 u2 = mulmod(R, w, nn);
-        (uint256 x1, uint256 y1) = scalarMult(gx, gy, u1);
-        (uint256 x2, uint256 y2) = scalarMult(X, Y, u2);
+        uint256 d = uint256(digest);
+        uint256 w = Math.invMod(s, nn);
+        (uint256 x1, uint256 y1) = scalarMult(gx, gy, mulmod(d, w, nn));
+        (uint256 x2, uint256 y2) = scalarMult(px, py, mulmod(r, w, nn));
         (uint256 x, ) = add(x1, y1, x2, y2);
 
-        return (x % pp == R);
+        return (x % pp == r);
+    }
+
+    /**
+     * @dev public key recovery
+     * @param r - signature half R
+     * @param s - signature half S
+     * @param v - signature recovery param
+     * @param digest - hashed message
+     */
+    function recovery(uint256 r, uint256 s, uint8 v, bytes32 digest) internal view returns (uint256, uint256) {
+        // TODO: check v == 0 || v == 1
+
+        // Reconstruct R from its x coordinate (r)
+        uint256 Rx = r;
+        uint256 Ry2 = addmod(mulmod(addmod(mulmod(Rx, Rx, pp), a, pp), Rx, pp), b, pp); // weierstrass equation y² = x³ + a.x + b
+        uint256 Ry = Math.sqrtMod(Ry2, pp);
+        if (Ry % 2 != v % 2) Ry = pp - Ry;
+
+        // Rebuild public key
+        uint256 ir = Math.invMod(r, nn);
+        uint256 u1 = mulmod(nn - uint256(digest), ir, nn);
+        uint256 u2 = mulmod(s, ir, nn);
+        (uint256 x1, uint256 y1) = scalarMult(gx, gy, u1);
+        (uint256 x2, uint256 y2) = scalarMult(Rx, Ry, u2);
+        return add(x1, y1, x2, y2);
     }
 
     function add(uint256 p1, uint256 p2, uint256 q1, uint256 q2) internal pure returns(uint256, uint256) {

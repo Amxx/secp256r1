@@ -3,19 +3,19 @@ const { expect } = require('chai');
 const { secp256r1 } = require('@noble/curves/p256');
 const { loadFixture } = require('@nomicfoundation/hardhat-network-helpers');
 
-const names = [
-  '$P256',
-  'Secp256r1',
-  'EllipticCurve',
-];
-
-async function fixture() {
-  return Promise.all(
-    names.map(name => ethers.deployContract(name).then(instance => [ name, instance ]))
-  ).then(Object.fromEntries);
-}
-
 describe('secp256r1', function () {
+  const names = [
+    '$P256',
+    'Secp256r1',
+    'EllipticCurve',
+  ];
+
+  async function fixture() {
+    return Promise.all(
+      names.map(name => ethers.deployContract(name).then(instance => [ name, instance ]))
+    ).then(Object.fromEntries);
+  }
+
   beforeEach(async function () {
     Object.assign(this, await loadFixture(fixture));
   });
@@ -34,6 +34,7 @@ describe('secp256r1', function () {
         'EllipticCurve.validateSignature': [],
         'Secp256r1.Verify': [],
         'P256.verify': [],
+        'P256.recovery': [],
       };
     });
 
@@ -52,10 +53,10 @@ describe('secp256r1', function () {
           secp256r1.getPublicKey(privateKey, false).slice(0x21, 0x41),
       ].map(ethers.hexlify)
 
-      const { r, s } = secp256r1.sign(messageHash.replace(/0x/, ''), privateKey);
+      const { r, s, recovery } = secp256r1.sign(messageHash.replace(/0x/, ''), privateKey);
       const signature = [ r, s ].map(v => ethers.toBeHex(v, 32));
 
-      Object.assign(this, { messageHash, privateKey, publicKey, signature });
+      Object.assign(this, { messageHash, privateKey, publicKey, signature, recovery });
     });
 
     it.skip('confirm that a valid point is on the curve', async function () {
@@ -83,6 +84,12 @@ describe('secp256r1', function () {
         this.estimations['EllipticCurve.validateSignature'].push(await this.EllipticCurve.validateSignature.estimateGas(this.messageHash, this.signature, this.publicKey));
         this.estimations['Secp256r1.Verify'               ].push(await this.Secp256r1.Verify.estimateGas(...this.publicKey, ...this.signature, this.messageHash));
         this.estimations['P256.verify'                    ].push(await this.$P256.$verify.estimateGas(...this.publicKey, ...this.signature, this.messageHash));
+      });
+
+      it(`recover public key (run ${i + 1}/${length})`, async function () {
+        expect(await this.$P256.$recovery(...this.signature, this.recovery, this.messageHash)).to.deep.equal(this.publicKey);
+
+        this.estimations['P256.recovery'].push(await this.$P256.$recovery.estimateGas(...this.signature, this.recovery, this.messageHash));
       });
     });
 

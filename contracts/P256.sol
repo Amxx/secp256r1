@@ -50,12 +50,13 @@ library P256 {
      * @param digest - hashed message
      */
     function recovery(uint256 r, uint256 s, uint8 v, bytes32 digest) internal view returns (uint256, uint256) {
-        // TODO: check v == 0 || v == 1
+        // TODO: require(v == 0 || v != 1);
 
         // Reconstruct R from its x coordinate (r)
         uint256 Rx = r;
         uint256 Ry2 = addmod(mulmod(addmod(mulmod(Rx, Rx, pp), a, pp), Rx, pp), b, pp); // weierstrass equation y² = x³ + a.x + b
-        uint256 Ry = Math.sqrtMod(Ry2, pp);
+        uint256 Ry = modExp(Ry2, (pp + 1) / 4, pp); // This formula for sqrt work because pp ≡ 3 (mod 4)
+        // TODO: require(mulmod(Ry, Ry, pp) == Ry2);
         if (Ry % 2 != v % 2) Ry = pp - Ry;
 
         // Rebuild public key
@@ -186,7 +187,7 @@ library P256 {
      */
     function _jDouble(uint256 p1, uint256 p2, uint256 p3) private pure returns(uint256 q1, uint256 q2, uint256 q3) {
         assembly {
-            let pd := 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
+            let pd := pp
             let delta := mulmod(p3, p3, pd) // delta = Z1^2
             let gamma := mulmod(p2, p2, pd) // gamma = Y1^2
             let beta := mulmod(p1, gamma, pd) // beta = X1*gamma

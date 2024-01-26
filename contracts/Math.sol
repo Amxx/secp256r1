@@ -301,14 +301,6 @@ library Math {
         return abi.decode(result, (uint256));
     }
 
-    // ================================ NOT implemented in @openzeppelin/contracts yes ================================
-    function sqrtMod(uint256 a, uint256 n) internal view returns (uint256) {
-        require(n % 4 == 3, 'Not supported yet');
-        uint256 r = modExp(a, (n + 1) / 4, n);
-        return mulmod(r, r, n) == a ? r : 0;
-    }
-    // ================================ NOT implemented in @openzeppelin/contracts yes ================================
-
     /**
      * @dev Returns the square root of a number. If the number is not a perfect square, the value is rounded
      * towards zero.

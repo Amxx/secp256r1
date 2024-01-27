@@ -33,7 +33,7 @@ library P256 {
         // Should be s >= ss, but tolling generates signatures with points on both sides.
         if (r >= nn || s >= nn) return false;
 
-        uint256 d = uint256(digest);
+        uint256 d = uint256(digest) % nn;
         uint256 w = Math.invMod(s, nn);
         uint256 u1 = mulmod(d, w, nn);
         uint256 u2 = mulmod(r, w, nn);
@@ -61,7 +61,7 @@ library P256 {
         if (mulmod(ry, ry, pp) != ry2) return (0, 0);
         if (ry % 2 != v % 2) ry = pp - ry;
 
-        uint256 d = uint256(digest);
+        uint256 d = uint256(digest) % nn;
         uint256 w = Math.invMod(r, nn);
         uint256 u1 = mulmod(nn - d, w, nn);
         uint256 u2 = mulmod(s, w, nn);

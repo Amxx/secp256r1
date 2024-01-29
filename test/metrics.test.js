@@ -2,6 +2,7 @@ const { ethers } = require('hardhat');
 const { expect } = require('chai');
 const { secp256r1 } = require('@noble/curves/p256');
 const { loadFixture } = require('@nomicfoundation/hardhat-network-helpers');
+const { prepareSignature } = require('./utils');
 
 const RUN_COUNT = 10;
 
@@ -16,19 +17,6 @@ describe('gas metrics', function () {
       .map(([ key, estimates]) => [key, estimates.map(Number).reduce((a, b) => a + b, 0) / estimates.length])
       .sort(([, a], [, b]) => a - b)
       .forEach(([ key, average], i) => console.log(`[${i}] ${~~average} --- ${key}`));
-  });
-
-  beforeEach(async function () {
-    const messageHash = ethers.hexlify(ethers.randomBytes(32));
-    const privateKey = secp256r1.utils.randomPrivateKey();
-    const publicKey = [
-        secp256r1.getPublicKey(privateKey, false).slice(0x01, 0x21),
-        secp256r1.getPublicKey(privateKey, false).slice(0x21, 0x41),
-    ].map(ethers.hexlify)
-    const { r, s, recovery } = secp256r1.sign(messageHash.replace(/0x/, ''), privateKey);
-    const signature = [ r, s ].map(v => ethers.toBeHex(v, 32));
-
-    Object.assign(this, { messageHash, privateKey, publicKey, signature, recovery });
   });
 
   for (const { contract, signature, args, skip } of  [{
@@ -65,7 +53,7 @@ describe('gas metrics', function () {
       });
 
       beforeEach(async function () {
-        Object.assign(this, await loadFixture(fixture));
+        Object.assign(this, await loadFixture(fixture), prepareSignature());
       });
 
       Array(RUN_COUNT).fill().forEach((_, i, {length}) => {

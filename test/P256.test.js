@@ -1,7 +1,7 @@
 const { ethers } = require('hardhat');
 const { expect } = require('chai');
-const { secp256r1 } = require('@noble/curves/p256');
 const { loadFixture } = require('@nomicfoundation/hardhat-network-helpers');
+const { prepareSignature } = require('./utils');
 
 describe('P256', function () {
   async function fixture() {
@@ -9,21 +9,8 @@ describe('P256', function () {
   }
 
   beforeEach(async function () {
-    Object.assign(this, await loadFixture(fixture));
-
-    const messageHash = ethers.hexlify(ethers.randomBytes(32));
-    const privateKey = secp256r1.utils.randomPrivateKey();
-    const publicKey = [
-        secp256r1.getPublicKey(privateKey, false).slice(0x01, 0x21),
-        secp256r1.getPublicKey(privateKey, false).slice(0x21, 0x41),
-    ].map(ethers.hexlify)
-
-    const { r, s, recovery } = secp256r1.sign(messageHash.replace(/0x/, ''), privateKey);
-    const signature = [ r, s ].map(v => ethers.toBeHex(v, 32));
-
-    Object.assign(this, { messageHash, privateKey, publicKey, signature, recovery });
+    Object.assign(this, await loadFixture(fixture), prepareSignature());
   });
-
 
   it('derivate public from private', async function () {
     expect(await this.mock.$getPublicKey(ethers.toBigInt(this.privateKey))).to.deep.equal(this.publicKey);

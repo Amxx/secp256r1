@@ -145,13 +145,13 @@ library P256 {
     /**
      * @dev returns affine coordinates from a jacobian input follows golang elliptic/crypto library
      */
-    function _affineFromJacobian(uint256 x, uint256 y, uint256 z) private view returns (uint256 ax, uint256 ay) {
-        if (z == 0) return (0, 0);
-        uint256 zinv = _primemod(z, pp);
+    function _affineFromJacobian(uint256 jx, uint256 jy, uint256 jz) private view returns (uint256 ax, uint256 ay) {
+        if (jz == 0) return (0, 0);
+        uint256 zinv = _primemod(jz, pp);
         uint256 zzinv = mulmod(zinv, zinv, pp);
         uint256 zzzinv = mulmod(zzinv, zinv, pp);
-        ax = mulmod(x, zzinv, pp);
-        ay = mulmod(y, zzzinv, pp);
+        ax = mulmod(jx, zzinv, pp);
+        ay = mulmod(jy, zzzinv, pp);
     }
 
     /**

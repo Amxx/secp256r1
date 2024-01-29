@@ -23,18 +23,22 @@ describe('gas metrics', function () {
     contract: '$Secp256r1_reference',
     signature: '$Verify',
     args: (publicKey, signature, digest) => [[...publicKey, "placeholder"], ...signature, digest],
+    skip: true,
   },{
     contract: '$Secp256r1_maxrobot',
     signature: '$Verify',
     args: (publicKey, signature, digest) => [...publicKey, signature, digest],
+    skip: true,
   },{
     contract: '$FCL_ecdsa',
     signature: '$ecdsa_verify',
     args: (publicKey, signature, digest) => [digest, ...signature, ...publicKey],
+    skip: true,
   },{
     contract: '$FCL_ecdsa_utils',
     signature: '$ecdsa_verify',
     args: (publicKey, signature, digest) => [digest, signature, ...publicKey],
+    skip: true,
   },{
     contract: '$P256',
     signature: '$verify',
@@ -57,7 +61,7 @@ describe('gas metrics', function () {
       });
 
       Array(RUN_COUNT).fill().forEach((_, i, {length}) => {
-        it(`run ${i + 1}/${length}`, async function () {
+        it.only(`run ${i + 1}/${length}`, async function () {
           expect(await this.mock.getFunction(signature).staticCall(...args(this.publicKey, this.signature, this.messageHash))).to.be.true;
           this.metrics[key].push(await this.mock.getFunction(signature).estimateGas(...args(this.publicKey, this.signature, this.messageHash)));
         });

@@ -148,93 +148,64 @@ library P256 {
     function _affineFromJacobian(uint256 x, uint256 y, uint256 z) private view returns (uint256 ax, uint256 ay) {
         if (z == 0) return (0, 0);
         uint256 zinv = _primemod(z, pp);
-        uint256 zinvsq = mulmod(zinv, zinv, pp);
-        uint256 zinvcb = mulmod(zinvsq, zinv, pp);
-        ax = mulmod(x, zinvsq, pp);
-        ay = mulmod(y, zinvcb, pp);
+        uint256 zzinv = mulmod(zinv, zinv, pp);
+        uint256 zzzinv = mulmod(zzinv, zinv, pp);
+        ax = mulmod(x, zzinv, pp);
+        ay = mulmod(y, zzzinv, pp);
     }
+
     /**
-     * @dev performs double Jacobian as defined below:
-     * https://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-3/doubling/mdbl-2007-bl.op3
+     * Point addition on the jacobian coordinates
+     * https://en.wikibooks.org/wiki/Cryptography/Prime_Curve/Jacobian_Coordinates
      */
-    function _jAdd(uint256 p1, uint256 p2, uint256 p3, uint256 q1, uint256 q2, uint256 q3) private pure returns (uint256 r1, uint256 r2, uint256 r3) {
-        if (p3 == 0) {
-            return (q1, q2, q3);
+    function _jAdd(uint256 x1, uint256 y1, uint256 z1, uint256 x2, uint256 y2, uint256 z2) private pure returns (uint256 x3, uint256 y3, uint256 z3) {
+        if (z1 == 0) {
+            return (x2, y2, z2);
         }
-        if (q3 == 0) {
-            return (p1, p2, p3);
+        if (z2 == 0) {
+            return (x1, y1, z1);
         }
         assembly {
-            let pd := 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
-            let z1z1 := mulmod(p3, p3, pd) // Z1Z1 = Z1^2
-            let z2z2 := mulmod(q3, q3, pd) // Z2Z2 = Z2^2
+            let p := pp
+            let zz1 := mulmod(z1, z1, p) // zz1 = z1²
+            let zz2 := mulmod(z2, z2, p) // zz2 = z2²
+            let u1 := mulmod(x1, zz2, p) // u1 = x1 * z2²
+            let u2 := mulmod(x2, zz1, p) // u2 = x2 * z1²
+            let s1 := mulmod(y1, mulmod(zz2, z2, p), p) // s1 = y1 * z2³
+            let s2 := mulmod(y2, mulmod(zz1, z1, p), p) // s2 = y2 * z1³
+            let h := addmod(u2, sub(p, u1), p)
+            let hh := mulmod(h, h, p)
+            let hhh := mulmod(h, hh, p)
+            let r := addmod(s2, sub(p, s1), p)
+            let rr := mulmod(r, r, p)
 
-            let u1 := mulmod(p1, z2z2, pd) // U1 = X1*Z2Z2
-            let u2 := mulmod(q1, z1z1, pd) // U2 = X2*Z1Z1
-
-            let s1 := mulmod(p2, mulmod(z2z2, q3, pd), pd) // S1 = Y1*Z2*Z2Z2
-            let s2 := mulmod(q2, mulmod(z1z1, p3, pd), pd) // S2 = Y2*Z1*Z1Z1
-
-            let p3q3 := addmod(p3, q3, pd)
-
-            if lt(u2, u1) { u2 := add(pd, u2) } // u2 = u2+pd
-
-            let h := sub(u2, u1) // H = U2-U1
-
-            let i := mulmod(0x02, h, pd)
-            i := mulmod(i, i, pd) // I = (2*H)^2
-
-            let j := mulmod(h, i, pd) // J = H*I
-            if lt(s2, s1) { s2 := add(pd, s2) } // u2 = u2+pd
-
-            let rr := mulmod(0x02, sub(s2, s1), pd) // r = 2*(S2-S1)
-            r1 := mulmod(rr, rr, pd) // X3 = R^2
-
-            let v := mulmod(u1, i, pd) // V = U1*I
-            let j2v := addmod(j, mulmod(0x02, v, pd), pd)
-            if lt(r1, j2v) { r1 := add(pd, r1) } // X3 = X3+pd
-
-            r1 := sub(r1, j2v)
-
-            // Y3 = r*(V-X3)-2*S1*J
-            let s12j := mulmod(mulmod(0x02, s1, pd), j, pd)
-
-            if lt(v, r1) { v := add(pd, v) }
-            r2 := mulmod(rr, sub(v, r1), pd)
-
-            if lt(r2, s12j) { r2 := add(pd, r2) }
-            r2 := sub(r2, s12j)
-
-            // Z3 = ((Z1+Z2)^2-Z1Z1-Z2Z2)*H
-            z1z1 := addmod(z1z1, z2z2, pd)
-            j2v := mulmod(p3q3, p3q3, pd)
-            if lt(j2v, z1z1) { j2v := add(pd, j2v) }
-            r3 := mulmod(sub(j2v, z1z1), h, pd)
+            // x3 = r²-H³-2*u1*h²
+            x3 := addmod(addmod(rr, sub(p, hhh), p), sub(p, mulmod(2, mulmod(u1, hh, p), p)), p)
+            // y3 = r*(u1*H²-x3)-s1*h³
+            y3 := addmod(mulmod(r,addmod(mulmod(u1, hh, p), sub(p, x3), p), p), sub(p, mulmod(s1, hhh, p)), p)
+            // z3 = h*z1*z2
+            z3 := mulmod(h, mulmod(z1, z2, p), p)
         }
-        return (r1, r2, r3);
     }
 
-    // Point doubling on the modified jacobian coordinates
-    // http://point-at-infinity.org/ecc/Prime_Curve_Modified_Jacobian_Coordinates.html
-    function _jDouble(uint256 x, uint256 y, uint256 z) private pure returns (uint256 x3, uint256 y3, uint256 z3) {
+    /**
+     * Point doubling on the jacobian coordinates
+     * https://en.wikibooks.org/wiki/Cryptography/Prime_Curve/Jacobian_Coordinates
+     */
+    function _jDouble(uint256 x, uint256 y, uint256 z) private pure returns (uint256 rx, uint256 ry, uint256 rz) {
         assembly {
-            let pd := 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
-            let z2 := mulmod(z, z, pd)
-            let az4 :=
-                mulmod(0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC, mulmod(z2, z2, pd), pd)
-            let y2 := mulmod(y, y, pd)
-            let s := mulmod(0x04, mulmod(x, y2, pd), pd)
-            let u := mulmod(0x08, mulmod(y2, y2, pd), pd)
-            let m := addmod(mulmod(0x03, mulmod(x, x, pd), pd), az4, pd)
-            let twos := mulmod(0x02, s, pd)
-            let m2 := mulmod(m, m, pd)
-            if lt(m2, twos) { m2 := add(pd, m2) }
-            x3 := sub(m2, twos)
-            if lt(s, x3) { s := add(pd, s) }
-            y3 := mulmod(m, sub(s, x3), pd)
-            if lt(y3, u) { y3 := add(pd, y3) }
-            y3 := sub(y3, u)
-            z3 := mulmod(0x02, mulmod(y, z, pd), pd)
+            let p := pp
+            let y2 := mulmod(y, y, p)
+            let z2 := mulmod(z, z, p)
+            let s := mulmod(4, mulmod(x, y2, p), p) // s = 4*x*y²
+            let m := addmod(mulmod(3, mulmod(x, x, p), p), mulmod(a, mulmod(z2, z2, p), p), p) // m = 3*x²+a*z⁴
+
+            // rx = m²-2*s
+            rx := addmod(mulmod(m, m, p), sub(p, mulmod(2, s, p)), p)
+            // ry = m*(s-rx)-8*y⁴
+            ry := addmod(mulmod(m, addmod(s, sub(p, rx), p), p), sub(p, mulmod(8, mulmod(y2, y2, p), p)), p)
+            // rz = 2*y*z
+            rz := mulmod(2, mulmod(y, z, p), p)
         }
     }
 

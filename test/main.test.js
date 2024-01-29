@@ -3,6 +3,75 @@ const { expect } = require('chai');
 const { secp256r1 } = require('@noble/curves/p256');
 const { loadFixture } = require('@nomicfoundation/hardhat-network-helpers');
 
+const RUN_COUNT = 10;
+
+const version = [{
+  contract: '$Secp256r1_reference',
+  signature: '$Verify',
+  args: (publicKey, signature, digest) => [[...publicKey, "placeholder"], ...signature, digest],
+},{
+  contract: '$Secp256r1_maxrobot',
+  signature: '$Verify',
+  args: (publicKey, signature, digest) => [...publicKey, signature, digest],
+},{
+  contract: '$FCL_ecdsa',
+  signature: '$ecdsa_verify',
+  args: (publicKey, signature, digest) => [digest, ...signature, ...publicKey],
+},{
+  contract: '$FCL_ecdsa_utils',
+  signature: '$ecdsa_verify',
+  args: (publicKey, signature, digest) => [digest, signature, ...publicKey],
+},{
+  contract: '$P256',
+  signature: '$verify',
+  args: (publicKey, signature, digest) => [...publicKey, ...signature, digest],
+}];
+
+describe('gas metrics', function () {
+  async function fixture() {
+    return Promise.all(
+      version.map(({ contract }) => ethers.deployContract(contract).then(instance => [ contract, instance ]))
+    ).then(Object.fromEntries);
+  }
+
+  before(async function () {
+    this.metrics = Object.fromEntries(version.map(({ contract, signature }) => [ `${contract}.${signature}`, []]));
+  });
+
+  after(async function () {
+    Object.entries(this.metrics)
+      .filter(([ _, estimates]) => estimates.length > 0)
+      .map(([ name, estimates]) => [name, estimates.map(Number).reduce((a, b) => a + b, 0) / estimates.length])
+      .sort(([, a], [, b]) => a - b)
+      .forEach(([ name, average], i) => console.log(`[${i}] ${average} --- ${name}`));
+  });
+
+  beforeEach(async function () {
+    Object.assign(this, await loadFixture(fixture));
+
+    const messageHash = ethers.hexlify(ethers.randomBytes(32));
+    const privateKey = secp256r1.utils.randomPrivateKey();
+    const publicKey = [
+        secp256r1.getPublicKey(privateKey, false).slice(0x01, 0x21),
+        secp256r1.getPublicKey(privateKey, false).slice(0x21, 0x41),
+    ].map(ethers.hexlify)
+    const { r, s, recovery } = secp256r1.sign(messageHash.replace(/0x/, ''), privateKey);
+    const signature = [ r, s ].map(v => ethers.toBeHex(v, 32));
+
+    Object.assign(this, { messageHash, privateKey, publicKey, signature, recovery });
+  });
+
+  for (const { contract, signature, args } of version) {
+    Array(RUN_COUNT).fill().forEach((_, i, {length}) => {
+      it(`test ${contract}.${signature}: (run ${i + 1}/${length})`, async function () {
+        expect(await this[contract].getFunction(signature).staticCall(...args(this.publicKey, this.signature, this.messageHash))).to.be.true;
+        this.metrics[`${contract}.${signature}`].push(await this[contract].getFunction(signature).estimateGas(...args(this.publicKey, this.signature, this.messageHash)));
+      });
+    });
+  }
+});
+
+/*
 describe('secp256r1', function () {
   const names = [
     '$P256',
@@ -115,3 +184,4 @@ describe('secp256r1', function () {
     });
   });
 });
+*/

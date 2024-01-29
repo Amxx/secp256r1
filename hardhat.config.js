@@ -13,6 +13,6 @@ module.exports = {
     ],
   },
   exposed: {
-    exclude: ['vendor/*'],
+    exclude: [],
   },
 };

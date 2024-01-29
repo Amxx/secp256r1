@@ -35,7 +35,7 @@ library P256 {
         if (r >= nn || s >= nn) return false;
 
         JPoint[16] memory points = _preComputeJacobianPoints(px, py);
-        uint256 w = _primemod(s, nn);
+        uint256 w = _invModPrime(s, nn);
         uint256 u1 = mulmod(e, w, nn);
         uint256 u2 = mulmod(r, w, nn);
         (uint256 x, ) = _shamirMultJacobian(points, u1, u2);
@@ -59,7 +59,7 @@ library P256 {
         if (ry % 2 != v % 2) ry = pp - ry;
 
         JPoint[16] memory points = _preComputeJacobianPoints(rx, ry);
-        uint256 w = _primemod(r, nn);
+        uint256 w = _invModPrime(r, nn);
         uint256 u1 = mulmod(nn - (e % nn), w, nn);
         uint256 u2 = mulmod(s, w, nn);
         (uint256 x, uint256 y) = _shamirMultJacobian(points, u1, u2);
@@ -147,7 +147,7 @@ library P256 {
      */
     function _affineFromJacobian(uint256 jx, uint256 jy, uint256 jz) private view returns (uint256 ax, uint256 ay) {
         if (jz == 0) return (0, 0);
-        uint256 zinv = _primemod(jz, pp);
+        uint256 zinv = _invModPrime(jz, pp);
         uint256 zzinv = mulmod(zinv, zinv, pp);
         uint256 zzzinv = mulmod(zzinv, zinv, pp);
         ax = mulmod(jx, zzinv, pp);
@@ -177,10 +177,9 @@ library P256 {
             let hh := mulmod(h, h, p) // h²
             let hhh := mulmod(h, hh, p) // h³
             let r := addmod(s2, sub(p, s1), p) // r = s2-s1
-            let rr := mulmod(r, r, p) // r²
 
             // x' = r²-h³-2*u1*h²
-            x3 := addmod(addmod(rr, sub(p, hhh), p), sub(p, mulmod(2, mulmod(u1, hh, p), p)), p)
+            x3 := addmod(addmod(mulmod(r, r, p), sub(p, hhh), p), sub(p, mulmod(2, mulmod(u1, hh, p), p)), p)
             // y' = r*(u1*h²-x')-s1*h³
             y3 := addmod(mulmod(r,addmod(mulmod(u1, hh, p), sub(p, x3), p), p), sub(p, mulmod(s1, hhh, p)), p)
             // z' = h*z1*z2
@@ -211,7 +210,7 @@ library P256 {
 
     // From fermats little theorem https://en.wikipedia.org/wiki/Fermat%27s_little_theorem:
     // `a**(p-1) ≡ 1 mod p`. This means that `a**(p-2)` is an inverse of a in Fp.
-    function _primemod(uint256 value, uint256 p) private view returns (uint256) {
+    function _invModPrime(uint256 value, uint256 p) private view returns (uint256) {
         return Math.modExp(value, p - 2, p);
     }
 }

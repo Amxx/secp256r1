@@ -21,7 +21,6 @@ library P256 {
     uint256 constant nn = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551;
     uint256 constant a = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC;
     uint256 constant b = 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B;
-    uint256 constant MOST_SIGNIFICANT = 0xc000000000000000000000000000000000000000000000000000000000000000;
 
     /**
      * @dev signature verification
@@ -93,53 +92,54 @@ library P256 {
         uint256 x = 0;
         uint256 y = 0;
         uint256 z = 0;
-        uint256 i = 0;
-        uint256 bits = 128;
         unchecked {
-            while (bits > 0) {
+            for (uint256 i = 0; i < 128; ++i) {
                 if (z > 0) {
                     (x, y, z) = _jDouble(x, y, z);
                     (x, y, z) = _jDouble(x, y, z);
                 }
-                i = ((u1 & MOST_SIGNIFICANT) >> 252) | ((u2 & MOST_SIGNIFICANT) >> 254);
-                if (i > 0) {
-                    (x, y, z) = _jAdd(x, y, z, points[i].x, points[i].y, points[i].z);
+                // Read 2 bits of u1, and 2 bits of u2. Combining the two give a lookup index in the table.
+                uint256 pos = (u1 >> 252 & 0xc) | (u2 >> 254 & 0x3);
+                if (pos > 0) {
+                    (x, y, z) = _jAdd(x, y, z, points[pos].x, points[pos].y, points[pos].z);
                 }
                 u1 <<= 2;
                 u2 <<= 2;
-                --bits;
             }
         }
         return _affineFromJacobian(x, y, z);
     }
 
+    /**
+     * @dev Precompute a matrice of usefull jacobian numbers associated to a given P. This can be seen as a 4x4 matrix
+     * that contains combinaison of P and G (generator) up to 3 times each. See table bellow:
+     *
+     * ┌────┬─────────────────────┐
+     * │  i │  0    1     2     3 │
+     * ├────┼─────────────────────┤
+     * │  0 │  0    p    2p    3p │
+     * │  4 │  g  g+p  g+2p  g+3p │
+     * │  8 │ 2g 2g+p 2g+2p 2g+3p │
+     * │ 12 │ 3g 3g+p 3g+2p 3g+3p │
+     * └────┴─────────────────────┘
+     */
     function _preComputeJacobianPoints(uint256 px, uint256 py) private pure returns (JPoint[16] memory points) {
         points[0x00] = JPoint(0, 0, 0);
         points[0x01] = JPoint(px, py, 1);
         points[0x04] = JPoint(gx, gy, 1);
-        points[0x02] = _jPointDouble(points[0x01]);
-        points[0x08] = _jPointDouble(points[0x04]);
-        points[0x03] = _jPointAdd(points[0x01], points[0x02]);
-        points[0x05] = _jPointAdd(points[0x01], points[0x04]);
-        points[0x06] = _jPointAdd(points[0x02], points[0x04]);
-        points[0x07] = _jPointAdd(points[0x03], points[0x04]);
-        points[0x09] = _jPointAdd(points[0x01], points[0x08]);
-        points[0x0a] = _jPointAdd(points[0x02], points[0x08]);
-        points[0x0b] = _jPointAdd(points[0x03], points[0x08]);
-        points[0x0c] = _jPointAdd(points[0x04], points[0x08]);
-        points[0x0d] = _jPointAdd(points[0x01], points[0x0c]);
-        points[0x0e] = _jPointAdd(points[0x02], points[0x0c]);
-        points[0x0f] = _jPointAdd(points[0x03], points[0x0C]);
-    }
-
-    function _jPointAdd(JPoint memory p1, JPoint memory p2) private pure returns (JPoint memory) {
-        (uint256 x, uint256 y, uint256 z) = _jAdd(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
-        return JPoint(x, y, z);
-    }
-
-    function _jPointDouble(JPoint memory p) private pure returns (JPoint memory) {
-        (uint256 x, uint256 y, uint256 z) = _jDouble(p.x, p.y, p.z);
-        return JPoint(x, y, z);
+        points[0x02] = _jDoublePoint(points[0x01]);
+        points[0x08] = _jDoublePoint(points[0x04]);
+        points[0x03] = _jAddPoint(points[0x01], points[0x02]);
+        points[0x05] = _jAddPoint(points[0x01], points[0x04]);
+        points[0x06] = _jAddPoint(points[0x02], points[0x04]);
+        points[0x07] = _jAddPoint(points[0x03], points[0x04]);
+        points[0x09] = _jAddPoint(points[0x01], points[0x08]);
+        points[0x0a] = _jAddPoint(points[0x02], points[0x08]);
+        points[0x0b] = _jAddPoint(points[0x03], points[0x08]);
+        points[0x0c] = _jAddPoint(points[0x04], points[0x08]);
+        points[0x0d] = _jAddPoint(points[0x01], points[0x0c]);
+        points[0x0e] = _jAddPoint(points[0x02], points[0x0c]);
+        points[0x0f] = _jAddPoint(points[0x03], points[0x0C]);
     }
 
     /**
@@ -155,7 +155,7 @@ library P256 {
     }
 
     /**
-     * Point addition on the jacobian coordinates
+     * @dev Point addition on the jacobian coordinates
      * https://en.wikibooks.org/wiki/Cryptography/Prime_Curve/Jacobian_Coordinates
      */
     function _jAdd(uint256 x1, uint256 y1, uint256 z1, uint256 x2, uint256 y2, uint256 z2) private pure returns (uint256 x3, uint256 y3, uint256 z3) {
@@ -187,8 +187,13 @@ library P256 {
         }
     }
 
+    function _jAddPoint(JPoint memory p1, JPoint memory p2) private pure returns (JPoint memory) {
+        (uint256 x, uint256 y, uint256 z) = _jAdd(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+        return JPoint(x, y, z);
+    }
+
     /**
-     * Point doubling on the jacobian coordinates
+     * @dev Point doubling on the jacobian coordinates
      * https://en.wikibooks.org/wiki/Cryptography/Prime_Curve/Jacobian_Coordinates
      */
     function _jDouble(uint256 x, uint256 y, uint256 z) private pure returns (uint256 x2, uint256 y2, uint256 z2) {
@@ -208,8 +213,15 @@ library P256 {
         }
     }
 
-    // From fermats little theorem https://en.wikipedia.org/wiki/Fermat%27s_little_theorem:
-    // `a**(p-1) ≡ 1 mod p`. This means that `a**(p-2)` is an inverse of a in Fp.
+    function _jDoublePoint(JPoint memory p) private pure returns (JPoint memory) {
+        (uint256 x, uint256 y, uint256 z) = _jDouble(p.x, p.y, p.z);
+        return JPoint(x, y, z);
+    }
+
+    /**
+     *@dev From Fermat's little theorem https://en.wikipedia.org/wiki/Fermat%27s_little_theorem:
+     * `a**(p-1) ≡ 1 mod p`. This means that `a**(p-2)` is an inverse of a in Fp.
+     */
     function _invModPrime(uint256 value, uint256 p) private view returns (uint256) {
         return Math.modExp(value, p - 2, p);
     }

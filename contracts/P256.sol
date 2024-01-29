@@ -179,9 +179,9 @@ library P256 {
             let r := addmod(s2, sub(p, s1), p) // r = s2-s1
             let rr := mulmod(r, r, p) // r²
 
-            // x' = r²-H³-2*u1*h²
+            // x' = r²-h³-2*u1*h²
             x3 := addmod(addmod(rr, sub(p, hhh), p), sub(p, mulmod(2, mulmod(u1, hh, p), p)), p)
-            // y' = r*(u1*H²-x')-s1*h³
+            // y' = r*(u1*h²-x')-s1*h³
             y3 := addmod(mulmod(r,addmod(mulmod(u1, hh, p), sub(p, x3), p), p), sub(p, mulmod(s1, hhh, p)), p)
             // z' = h*z1*z2
             z3 := mulmod(h, mulmod(z1, z2, p), p)

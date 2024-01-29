@@ -169,21 +169,21 @@ library P256 {
             let p := pp
             let zz1 := mulmod(z1, z1, p) // zz1 = z1²
             let zz2 := mulmod(z2, z2, p) // zz2 = z2²
-            let u1 := mulmod(x1, zz2, p) // u1 = x1 * z2²
-            let u2 := mulmod(x2, zz1, p) // u2 = x2 * z1²
-            let s1 := mulmod(y1, mulmod(zz2, z2, p), p) // s1 = y1 * z2³
-            let s2 := mulmod(y2, mulmod(zz1, z1, p), p) // s2 = y2 * z1³
-            let h := addmod(u2, sub(p, u1), p)
-            let hh := mulmod(h, h, p)
-            let hhh := mulmod(h, hh, p)
-            let r := addmod(s2, sub(p, s1), p)
-            let rr := mulmod(r, r, p)
+            let u1 := mulmod(x1, zz2, p) // u1 = x1*z2²
+            let u2 := mulmod(x2, zz1, p) // u2 = x2*z1²
+            let s1 := mulmod(y1, mulmod(zz2, z2, p), p) // s1 = y1*z2³
+            let s2 := mulmod(y2, mulmod(zz1, z1, p), p) // s2 = y2*z1³
+            let h := addmod(u2, sub(p, u1), p) // h = u2-u1
+            let hh := mulmod(h, h, p) // h²
+            let hhh := mulmod(h, hh, p) // h³
+            let r := addmod(s2, sub(p, s1), p) // r = s2-s1
+            let rr := mulmod(r, r, p) // r²
 
-            // x3 = r²-H³-2*u1*h²
+            // x' = r²-H³-2*u1*h²
             x3 := addmod(addmod(rr, sub(p, hhh), p), sub(p, mulmod(2, mulmod(u1, hh, p), p)), p)
-            // y3 = r*(u1*H²-x3)-s1*h³
+            // y' = r*(u1*H²-x')-s1*h³
             y3 := addmod(mulmod(r,addmod(mulmod(u1, hh, p), sub(p, x3), p), p), sub(p, mulmod(s1, hhh, p)), p)
-            // z3 = h*z1*z2
+            // z' = h*z1*z2
             z3 := mulmod(h, mulmod(z1, z2, p), p)
         }
     }
@@ -192,20 +192,20 @@ library P256 {
      * Point doubling on the jacobian coordinates
      * https://en.wikibooks.org/wiki/Cryptography/Prime_Curve/Jacobian_Coordinates
      */
-    function _jDouble(uint256 x, uint256 y, uint256 z) private pure returns (uint256 rx, uint256 ry, uint256 rz) {
+    function _jDouble(uint256 x, uint256 y, uint256 z) private pure returns (uint256 x2, uint256 y2, uint256 z2) {
         assembly {
             let p := pp
-            let y2 := mulmod(y, y, p)
-            let z2 := mulmod(z, z, p)
-            let s := mulmod(4, mulmod(x, y2, p), p) // s = 4*x*y²
-            let m := addmod(mulmod(3, mulmod(x, x, p), p), mulmod(a, mulmod(z2, z2, p), p), p) // m = 3*x²+a*z⁴
+            let yy := mulmod(y, y, p)
+            let zz := mulmod(z, z, p)
+            let s := mulmod(4, mulmod(x, yy, p), p) // s = 4*x*y²
+            let m := addmod(mulmod(3, mulmod(x, x, p), p), mulmod(a, mulmod(zz, zz, p), p), p) // m = 3*x²+a*z⁴
 
-            // rx = m²-2*s
-            rx := addmod(mulmod(m, m, p), sub(p, mulmod(2, s, p)), p)
-            // ry = m*(s-rx)-8*y⁴
-            ry := addmod(mulmod(m, addmod(s, sub(p, rx), p), p), sub(p, mulmod(8, mulmod(y2, y2, p), p)), p)
-            // rz = 2*y*z
-            rz := mulmod(2, mulmod(y, z, p), p)
+            // x' = m²-2*s
+            x2 := addmod(mulmod(m, m, p), sub(p, mulmod(2, s, p)), p)
+            // y' = m*(s-x')-8*y⁴
+            y2 := addmod(mulmod(m, addmod(s, sub(p, x2), p), p), sub(p, mulmod(8, mulmod(yy, yy, p), p)), p)
+            // z2 = 2*y*z
+            z2 := mulmod(2, mulmod(y, z, p), p)
         }
     }
 

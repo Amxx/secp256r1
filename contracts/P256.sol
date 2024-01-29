@@ -65,53 +65,30 @@ library P256 {
         return (x, y);
     }
 
-    function getPublicKey(uint256 privateKey) internal view returns (uint256, uint256) {
-        uint256 k = privateKey;
+    /**
+     * @dev derivate public key
+     * @param k - private key
+     */
+    function getPublicKey(uint256 k) internal view returns (uint256, uint256) {
         uint256 x = 0;
         uint256 y = 0;
         uint256 z = 0;
         unchecked {
             for (uint256 i = 0; i < 256; ++i) {
-                (x, y, z) = _jDouble(x, y, z);
-                if ((k >> (255 - i)) & 0x1 == 0x1) {
-                    (x, y, z) = _jAdd(gx, gy, 1, x, y, z);
-                }
-            }
-        }
-        return _affineFromJacobian(x, y, z);
-    }
-
-    /**
-     * Strauss Shamir trick for EC multiplication
-     * https://stackoverflow.com/questions/50993471/ec-scalar-multiplication-with-strauss-shamir-method
-     * we optimise on this a bit to do with 2 bits at a time rather than a single bit
-     * the individual points for a single pass are precomputed
-     * overall this reduces the number of additions while keeping the same number of doublings
-     */
-    function _shamirMultJacobian(JPoint[16] memory points, uint256 u1, uint256 u2) private view returns (uint256, uint256) {
-        uint256 x = 0;
-        uint256 y = 0;
-        uint256 z = 0;
-        unchecked {
-            for (uint256 i = 0; i < 128; ++i) {
                 if (z > 0) {
                     (x, y, z) = _jDouble(x, y, z);
-                    (x, y, z) = _jDouble(x, y, z);
                 }
-                // Read 2 bits of u1, and 2 bits of u2. Combining the two give a lookup index in the table.
-                uint256 pos = (u1 >> 252 & 0xc) | (u2 >> 254 & 0x3);
-                if (pos > 0) {
-                    (x, y, z) = _jAdd(x, y, z, points[pos].x, points[pos].y, points[pos].z);
+                if (k >> 255 > 0) {
+                    (x, y, z) = _jAdd(gx, gy, 1, x, y, z);
                 }
-                u1 <<= 2;
-                u2 <<= 2;
+                k <<= 1;
             }
         }
         return _affineFromJacobian(x, y, z);
     }
 
     /**
-     * @dev Precompute a matrice of usefull jacobian numbers associated to a given P. This can be seen as a 4x4 matrix
+     * @dev Precompute a matrice of usefull jacobian points associated to a given P. This can be seen as a 4x4 matrix
      * that contains combinaison of P and G (generator) up to 3 times each. See table bellow:
      *
      * ┌────┬─────────────────────┐
@@ -143,7 +120,43 @@ library P256 {
     }
 
     /**
-     * @dev returns affine coordinates from a jacobian input follows golang elliptic/crypto library
+     * @dev Compute P·u1 + Q·u2 using the precomputed points for P and Q (see {_preComputeJacobianPoints}).
+     *
+     * Uses Strauss Shamir trick for EC multiplication
+     * https://stackoverflow.com/questions/50993471/ec-scalar-multiplication-with-strauss-shamir-method
+     * we optimise on this a bit to do with 2 bits at a time rather than a single bit
+     * the individual points for a single pass are precomputed
+     * overall this reduces the number of additions while keeping the same number of doublings
+     */
+    function _shamirMultJacobian(JPoint[16] memory points, uint256 u1, uint256 u2) private view returns (uint256, uint256) {
+        uint256 x = 0;
+        uint256 y = 0;
+        uint256 z = 0;
+        unchecked {
+            for (uint256 i = 0; i < 128; ++i) {
+                if (z > 0) {
+                    (x, y, z) = _jDouble(x, y, z);
+                    (x, y, z) = _jDouble(x, y, z);
+                }
+                // Read 2 bits of u1, and 2 bits of u2. Combining the two give a lookup index in the table.
+                uint256 pos = (u1 >> 252 & 0xc) | (u2 >> 254 & 0x3);
+                if (pos > 0) {
+                    (x, y, z) = _jAdd(x, y, z, points[pos].x, points[pos].y, points[pos].z);
+                }
+                u1 <<= 2;
+                u2 <<= 2;
+            }
+        }
+        return _affineFromJacobian(x, y, z);
+    }
+
+    /**
+     * @dev Reduce from jacobian to affine coordinates
+     * @param jx - jacobian coordinate x
+     * @param jy - jacobian coordinate y
+     * @param jz - jacobian coordinate z
+     * @return ax - affine coordiante x
+     * @return ay - affine coordiante y
      */
     function _affineFromJacobian(uint256 jx, uint256 jy, uint256 jz) private view returns (uint256 ax, uint256 ay) {
         if (jz == 0) return (0, 0);
@@ -208,7 +221,7 @@ library P256 {
             x2 := addmod(mulmod(m, m, p), sub(p, mulmod(2, s, p)), p)
             // y' = m*(s-x')-8*y⁴
             y2 := addmod(mulmod(m, addmod(s, sub(p, x2), p), p), sub(p, mulmod(8, mulmod(yy, yy, p), p)), p)
-            // z2 = 2*y*z
+            // z' = 2*y*z
             z2 := mulmod(2, mulmod(y, z, p), p)
         }
     }

@@ -19,26 +19,39 @@ describe('gas metrics', function () {
       .forEach(([ key, average], i) => console.log(`[${i}] ${~~average} --- ${key}`));
   });
 
-  for (const { contract, signature, args, skip } of  [{
+  for (const { contract, signature, args, expected, skip } of  [{
     contract: '$Secp256r1_itsobvioustech',
     signature: '$Verify',
-    args: (publicKey, signature, digest) => [[...publicKey, "placeholder"], ...signature, digest],
+    args: ({ publicKey, signature, messageHash }) => [[...publicKey, "placeholder"], ...signature, messageHash],
+    expected: () => true,
   },{
+    skip: true,
     contract: '$Secp256r1_maxrobot',
     signature: '$Verify',
-    args: (publicKey, signature, digest) => [...publicKey, signature, digest],
+    args: ({ publicKey, signature, messageHash }) => [...publicKey, signature, messageHash],
+    expected: () => true,
   },{
     contract: '$FCL_ecdsa',
     signature: '$ecdsa_verify',
-    args: (publicKey, signature, digest) => [digest, ...signature, ...publicKey],
+    args: ({ publicKey, signature, messageHash }) => [messageHash, ...signature, ...publicKey],
+    expected: () => true,
   },{
-    contract: '$FCL_ecdsa_utils',
-    signature: '$ecdsa_verify',
-    args: (publicKey, signature, digest) => [digest, signature, ...publicKey],
+    skip: true,
+    contract: '$FCL_ecdsa',
+    signature: '$ec_recover_r1',
+    args: ({ signature, recovery, messageHash }) => [messageHash, recovery + 27, ...signature],
+    expected: ({ publicKey }) => '0x' + ethers.keccak256(ethers.concat(publicKey)).slice(-40),
   },{
     contract: '$P256',
     signature: '$verify',
-    args: (publicKey, signature, digest) => [...publicKey, ...signature, digest],
+    args: ({ publicKey, signature, messageHash }) => [...publicKey, ...signature, messageHash],
+    expected: () => true,
+  },{
+    skip: true,
+    contract: '$P256',
+    signature: '$recovery',
+    args: ({ signature, recovery, messageHash }) => [...signature, recovery, messageHash],
+    expected: ({ publicKey }) => publicKey,
   }]) {
     if (skip) continue;
 
@@ -58,8 +71,8 @@ describe('gas metrics', function () {
 
       Array(RUN_COUNT).fill().forEach((_, i, {length}) => {
         it(`run ${i + 1}/${length}`, async function () {
-          expect(await this.mock.getFunction(signature).staticCall(...args(this.publicKey, this.signature, this.messageHash))).to.be.true;
-          this.metrics[key].push(await this.mock.getFunction(signature).estimateGas(...args(this.publicKey, this.signature, this.messageHash)));
+          expect(await this.mock.getFunction(signature).staticCall(...args(this))).to.deep.equal(expected(this));
+          this.metrics[key].push(await this.mock.getFunction(signature).estimateGas(...args(this)));
         });
       });
     });

@@ -61,11 +61,13 @@ describe('gas metrics', function () {
       }
 
       before(function () {
+        this.metrics[contract] = [];
         this.metrics[key] = [];
       });
 
       beforeEach(async function () {
         Object.assign(this, await loadFixture(fixture), prepareSignature());
+        await this.mock.deploymentTransaction().wait().then(({ gasUsed }) => this.metrics[contract].push(gasUsed));
       });
 
       Array(COUNT).fill().forEach((_, i, {length}) => {

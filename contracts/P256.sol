@@ -23,8 +23,11 @@ library P256 {
     uint256 constant gy = 0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5;
     uint256 constant pp = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF;
     uint256 constant nn = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551;
-    uint256 constant a = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC;
-    uint256 constant b = 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B;
+    uint256 constant aa = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC;
+    uint256 constant bb = 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B;
+    uint256 constant pp2 = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFD;
+    uint256 constant nn2 = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC63254F;
+    uint256 constant pp1div4 = 0x3fffffffc0000000400000000000000000000000400000000000000000000000;
 
     /**
      * @dev signature verification
@@ -38,7 +41,7 @@ library P256 {
         if (r == 0 || r >= nn || s == 0 || s >= nn || !isOnCurve(px, py)) return false;
 
         JPoint[16] memory points = _preComputeJacobianPoints(px, py);
-        uint256 w = _invModPrime(s, nn);
+        uint256 w = _invModN(s);
         uint256 u1 = mulmod(e, w, nn);
         uint256 u2 = mulmod(r, w, nn);
         (uint256 x, ) = _shamirMultJacobian(points, u1, u2);
@@ -56,13 +59,13 @@ library P256 {
         if (r == 0 || r >= nn || s == 0 || s >= nn || v > 1) return (0, 0);
 
         uint256 rx = r;
-        uint256 ry2 = addmod(mulmod(addmod(mulmod(rx, rx, pp), a, pp), rx, pp), b, pp); // weierstrass equation y² = x³ + a.x + b
-        uint256 ry = Math.modExp(ry2, (pp + 1) / 4, pp); // This formula for sqrt work because pp ≡ 3 (mod 4)
+        uint256 ry2 = addmod(mulmod(addmod(mulmod(rx, rx, pp), aa, pp), rx, pp), bb, pp); // weierstrass equation y² = x³ + a.x + b
+        uint256 ry = Math.modExp(ry2, pp1div4, pp); // This formula for sqrt work because pp ≡ 3 (mod 4)
         if (mulmod(ry, ry, pp) != ry2) return (0, 0);
         if (ry % 2 != v % 2) ry = pp - ry;
 
         JPoint[16] memory points = _preComputeJacobianPoints(rx, ry);
-        uint256 w = _invModPrime(r, nn);
+        uint256 w = _invModN(r);
         uint256 u1 = mulmod(nn - (e % nn), w, nn);
         uint256 u2 = mulmod(s, w, nn);
         (uint256 x, uint256 y) = _shamirMultJacobian(points, u1, u2);
@@ -95,10 +98,11 @@ library P256 {
      * @dev check if a point is on the curve.
      */
     function isOnCurve(uint256 x, uint256 y) internal pure returns (bool result) {
+        /// @solidity memory-safe-assembly
         assembly {
             let p := pp
             let lhs := mulmod(y, y, p)
-            let rhs := addmod(mulmod(addmod(mulmod(x, x, p), a, p), x, p), b, p)
+            let rhs := addmod(mulmod(addmod(mulmod(x, x, p), aa, p), x, p), bb, p)
             result := eq(lhs, rhs)
         }
     }
@@ -176,7 +180,7 @@ library P256 {
      */
     function _affineFromJacobian(uint256 jx, uint256 jy, uint256 jz) private view returns (uint256 ax, uint256 ay) {
         if (jz == 0) return (0, 0);
-        uint256 zinv = _invModPrime(jz, pp);
+        uint256 zinv = _invModP(jz);
         uint256 zzinv = mulmod(zinv, zinv, pp);
         uint256 zzzinv = mulmod(zzinv, zinv, pp);
         ax = mulmod(jx, zzinv, pp);
@@ -194,6 +198,7 @@ library P256 {
         if (z2 == 0) {
             return (x1, y1, z1);
         }
+        /// @solidity memory-safe-assembly
         assembly {
             let p := pp
             let zz1 := mulmod(z1, z1, p) // zz1 = z1²
@@ -226,12 +231,13 @@ library P256 {
      * https://en.wikibooks.org/wiki/Cryptography/Prime_Curve/Jacobian_Coordinates
      */
     function _jDouble(uint256 x, uint256 y, uint256 z) private pure returns (uint256 x2, uint256 y2, uint256 z2) {
+        /// @solidity memory-safe-assembly
         assembly {
             let p := pp
             let yy := mulmod(y, y, p)
             let zz := mulmod(z, z, p)
             let s := mulmod(4, mulmod(x, yy, p), p) // s = 4*x*y²
-            let m := addmod(mulmod(3, mulmod(x, x, p), p), mulmod(a, mulmod(zz, zz, p), p), p) // m = 3*x²+a*z⁴
+            let m := addmod(mulmod(3, mulmod(x, x, p), p), mulmod(aa, mulmod(zz, zz, p), p), p) // m = 3*x²+a*z⁴
 
             // x' = m²-2*s
             x2 := addmod(mulmod(m, m, p), sub(p, mulmod(2, s, p)), p)
@@ -251,7 +257,11 @@ library P256 {
      *@dev From Fermat's little theorem https://en.wikipedia.org/wiki/Fermat%27s_little_theorem:
      * `a**(p-1) ≡ 1 mod p`. This means that `a**(p-2)` is an inverse of a in Fp.
      */
-    function _invModPrime(uint256 value, uint256 p) private view returns (uint256) {
-        return Math.modExp(value, p - 2, p);
+    function _invModN(uint256 value) private view returns (uint256) {
+        return Math.modExp(value, nn2, nn);
+    }
+
+    function _invModP(uint256 value) private view returns (uint256) {
+        return Math.modExp(value, pp2, pp);
     }
 }

@@ -44,7 +44,7 @@ library P256 {
         uint256 w = _invModN(s);
         uint256 u1 = mulmod(e, w, nn);
         uint256 u2 = mulmod(r, w, nn);
-        (uint256 x, ) = _shamirMultJacobian(points, u1, u2);
+        (uint256 x, ) = _jMultShamir(points, u1, u2);
         return (x == r);
     }
 
@@ -68,29 +68,16 @@ library P256 {
         uint256 w = _invModN(r);
         uint256 u1 = mulmod(nn - (e % nn), w, nn);
         uint256 u2 = mulmod(s, w, nn);
-        (uint256 x, uint256 y) = _shamirMultJacobian(points, u1, u2);
+        (uint256 x, uint256 y) = _jMultShamir(points, u1, u2);
         return (x, y);
     }
 
     /**
      * @dev derivate public key
-     * @param k - private key
+     * @param privateKey - private key
      */
-    function getPublicKey(uint256 k) internal view returns (uint256, uint256) {
-        uint256 x = 0;
-        uint256 y = 0;
-        uint256 z = 0;
-        unchecked {
-            for (uint256 i = 0; i < 256; ++i) {
-                if (z > 0) {
-                    (x, y, z) = _jDouble(x, y, z);
-                }
-                if (k >> 255 > 0) {
-                    (x, y, z) = _jAdd(gx, gy, 1, x, y, z);
-                }
-                k <<= 1;
-            }
-        }
+    function getPublicKey(uint256 privateKey) internal view returns (uint256, uint256) {
+        (uint256 x, uint256 y, uint256 z) = _jMult(gx, gy, 1, privateKey);
         return _affineFromJacobian(x, y, z);
     }
 
@@ -105,69 +92,6 @@ library P256 {
             let rhs := addmod(mulmod(addmod(mulmod(x, x, p), aa, p), x, p), bb, p)
             result := eq(lhs, rhs)
         }
-    }
-
-    /**
-     * @dev Precompute a matrice of usefull jacobian points associated to a given P. This can be seen as a 4x4 matrix
-     * that contains combinaison of P and G (generator) up to 3 times each. See table bellow:
-     *
-     * ┌────┬─────────────────────┐
-     * │  i │  0    1     2     3 │
-     * ├────┼─────────────────────┤
-     * │  0 │  0    p    2p    3p │
-     * │  4 │  g  g+p  g+2p  g+3p │
-     * │  8 │ 2g 2g+p 2g+2p 2g+3p │
-     * │ 12 │ 3g 3g+p 3g+2p 3g+3p │
-     * └────┴─────────────────────┘
-     */
-    function _preComputeJacobianPoints(uint256 px, uint256 py) private pure returns (JPoint[16] memory points) {
-        points[0x00] = JPoint(0, 0, 0);
-        points[0x01] = JPoint(px, py, 1);
-        points[0x04] = JPoint(gx, gy, 1);
-        points[0x02] = _jDoublePoint(points[0x01]);
-        points[0x08] = _jDoublePoint(points[0x04]);
-        points[0x03] = _jAddPoint(points[0x01], points[0x02]);
-        points[0x05] = _jAddPoint(points[0x01], points[0x04]);
-        points[0x06] = _jAddPoint(points[0x02], points[0x04]);
-        points[0x07] = _jAddPoint(points[0x03], points[0x04]);
-        points[0x09] = _jAddPoint(points[0x01], points[0x08]);
-        points[0x0a] = _jAddPoint(points[0x02], points[0x08]);
-        points[0x0b] = _jAddPoint(points[0x03], points[0x08]);
-        points[0x0c] = _jAddPoint(points[0x04], points[0x08]);
-        points[0x0d] = _jAddPoint(points[0x01], points[0x0c]);
-        points[0x0e] = _jAddPoint(points[0x02], points[0x0c]);
-        points[0x0f] = _jAddPoint(points[0x03], points[0x0C]);
-    }
-
-    /**
-     * @dev Compute P·u1 + Q·u2 using the precomputed points for P and Q (see {_preComputeJacobianPoints}).
-     *
-     * Uses Strauss Shamir trick for EC multiplication
-     * https://stackoverflow.com/questions/50993471/ec-scalar-multiplication-with-strauss-shamir-method
-     * we optimise on this a bit to do with 2 bits at a time rather than a single bit
-     * the individual points for a single pass are precomputed
-     * overall this reduces the number of additions while keeping the same number of doublings
-     */
-    function _shamirMultJacobian(JPoint[16] memory points, uint256 u1, uint256 u2) private view returns (uint256, uint256) {
-        uint256 x = 0;
-        uint256 y = 0;
-        uint256 z = 0;
-        unchecked {
-            for (uint256 i = 0; i < 128; ++i) {
-                if (z > 0) {
-                    (x, y, z) = _jDouble(x, y, z);
-                    (x, y, z) = _jDouble(x, y, z);
-                }
-                // Read 2 bits of u1, and 2 bits of u2. Combining the two give a lookup index in the table.
-                uint256 pos = (u1 >> 252 & 0xc) | (u2 >> 254 & 0x3);
-                if (pos > 0) {
-                    (x, y, z) = _jAdd(x, y, z, points[pos].x, points[pos].y, points[pos].z);
-                }
-                u1 <<= 2;
-                u2 <<= 2;
-            }
-        }
-        return _affineFromJacobian(x, y, z);
     }
 
     /**
@@ -221,11 +145,6 @@ library P256 {
         }
     }
 
-    function _jAddPoint(JPoint memory p1, JPoint memory p2) private pure returns (JPoint memory) {
-        (uint256 x, uint256 y, uint256 z) = _jAdd(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
-        return JPoint(x, y, z);
-    }
-
     /**
      * @dev Point doubling on the jacobian coordinates
      * https://en.wikibooks.org/wiki/Cryptography/Prime_Curve/Jacobian_Coordinates
@@ -246,6 +165,91 @@ library P256 {
             // z' = 2*y*z
             z2 := mulmod(2, mulmod(y, z, p), p)
         }
+    }
+
+    /**
+     * @dev Point multiplication on the jacobian coordinates
+     */
+    function _jMult(uint256 x, uint256 y, uint256 z, uint256 k) private pure returns (uint256 x2, uint256 y2, uint256 z2) {
+        unchecked {
+            for (uint256 i = 0; i < 256; ++i) {
+                if (z > 0) {
+                    (x2, y2, z2) = _jDouble(x2, y2, z2);
+                }
+                if (k >> 255 > 0) {
+                    (x2, y2, z2) = _jAdd(x2, y2, z2, x, y, z);
+                }
+                k <<= 1;
+            }
+        }
+    }
+
+    /**
+     * @dev Compute P·u1 + Q·u2 using the precomputed points for P and Q (see {_preComputeJacobianPoints}).
+     *
+     * Uses Strauss Shamir trick for EC multiplication
+     * https://stackoverflow.com/questions/50993471/ec-scalar-multiplication-with-strauss-shamir-method
+     * we optimise on this a bit to do with 2 bits at a time rather than a single bit
+     * the individual points for a single pass are precomputed
+     * overall this reduces the number of additions while keeping the same number of doublings
+     */
+    function _jMultShamir(JPoint[16] memory points, uint256 u1, uint256 u2) private view returns (uint256, uint256) {
+        uint256 x = 0;
+        uint256 y = 0;
+        uint256 z = 0;
+        unchecked {
+            for (uint256 i = 0; i < 128; ++i) {
+                if (z > 0) {
+                    (x, y, z) = _jDouble(x, y, z);
+                    (x, y, z) = _jDouble(x, y, z);
+                }
+                // Read 2 bits of u1, and 2 bits of u2. Combining the two give a lookup index in the table.
+                uint256 pos = (u1 >> 252 & 0xc) | (u2 >> 254 & 0x3);
+                if (pos > 0) {
+                    (x, y, z) = _jAdd(x, y, z, points[pos].x, points[pos].y, points[pos].z);
+                }
+                u1 <<= 2;
+                u2 <<= 2;
+            }
+        }
+        return _affineFromJacobian(x, y, z);
+    }
+
+    /**
+     * @dev Precompute a matrice of usefull jacobian points associated to a given P. This can be seen as a 4x4 matrix
+     * that contains combinaison of P and G (generator) up to 3 times each. See table bellow:
+     *
+     * ┌────┬─────────────────────┐
+     * │  i │  0    1     2     3 │
+     * ├────┼─────────────────────┤
+     * │  0 │  0    p    2p    3p │
+     * │  4 │  g  g+p  g+2p  g+3p │
+     * │  8 │ 2g 2g+p 2g+2p 2g+3p │
+     * │ 12 │ 3g 3g+p 3g+2p 3g+3p │
+     * └────┴─────────────────────┘
+     */
+    function _preComputeJacobianPoints(uint256 px, uint256 py) private pure returns (JPoint[16] memory points) {
+        points[0x00] = JPoint(0, 0, 0);
+        points[0x01] = JPoint(px, py, 1);
+        points[0x04] = JPoint(gx, gy, 1);
+        points[0x02] = _jDoublePoint(points[0x01]);
+        points[0x08] = _jDoublePoint(points[0x04]);
+        points[0x03] = _jAddPoint(points[0x01], points[0x02]);
+        points[0x05] = _jAddPoint(points[0x01], points[0x04]);
+        points[0x06] = _jAddPoint(points[0x02], points[0x04]);
+        points[0x07] = _jAddPoint(points[0x03], points[0x04]);
+        points[0x09] = _jAddPoint(points[0x01], points[0x08]);
+        points[0x0a] = _jAddPoint(points[0x02], points[0x08]);
+        points[0x0b] = _jAddPoint(points[0x03], points[0x08]);
+        points[0x0c] = _jAddPoint(points[0x04], points[0x08]);
+        points[0x0d] = _jAddPoint(points[0x01], points[0x0c]);
+        points[0x0e] = _jAddPoint(points[0x02], points[0x0c]);
+        points[0x0f] = _jAddPoint(points[0x03], points[0x0C]);
+    }
+
+    function _jAddPoint(JPoint memory p1, JPoint memory p2) private pure returns (JPoint memory) {
+        (uint256 x, uint256 y, uint256 z) = _jAdd(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+        return JPoint(x, y, z);
     }
 
     function _jDoublePoint(JPoint memory p) private pure returns (JPoint memory) {

@@ -31,7 +31,7 @@ library P256 {
      * @param e - hashed message
      */
     function verify(uint256 px, uint256 py, uint256 r, uint256 s, uint256 e) internal view returns (bool) {
-        if (r >= nn || s >= nn) return false;
+        if (r == 0 || r >= nn || s == 0 || s >= nn) return false;
 
         JPoint[16] memory points = _preComputeJacobianPoints(px, py);
         uint256 w = _invModPrime(s, nn);
@@ -49,7 +49,7 @@ library P256 {
      * @param e - hashed message
      */
     function recovery(uint256 r, uint256 s, uint8 v, uint256 e) internal view returns (uint256, uint256) {
-        if (r >= nn || s >= nn || v > 1) return (0, 0);
+        if (r == 0 || r >= nn || s == 0 || s >= nn || v > 1) return (0, 0);
 
         uint256 rx = r;
         uint256 ry2 = addmod(mulmod(addmod(mulmod(rx, rx, pp), a, pp), rx, pp), b, pp); // weierstrass equation y² = x³ + a.x + b

@@ -24,7 +24,6 @@ describe('gas metrics', function () {
     args: ({ publicKey, signature, messageHash }) => [[...publicKey, "placeholder"], ...signature, messageHash],
     expected: () => true,
   },{
-    skip: true,
     contract: '$Secp256r1_maxrobot',
     signature: '$Verify',
     args: ({ publicKey, signature, messageHash }) => [...publicKey, signature, messageHash],
@@ -35,7 +34,6 @@ describe('gas metrics', function () {
     args: ({ publicKey, signature, messageHash }) => [messageHash, ...signature, ...publicKey],
     expected: () => true,
   },{
-    skip: true,
     contract: '$FCL_ecdsa',
     signature: '$ec_recover_r1',
     args: ({ signature, recovery, messageHash }) => [messageHash, recovery + 27, ...signature],
@@ -46,7 +44,6 @@ describe('gas metrics', function () {
     args: ({ publicKey, signature, messageHash }) => [...publicKey, ...signature, messageHash],
     expected: () => true,
   },{
-    skip: true,
     contract: '$P256',
     signature: '$recovery',
     args: ({ signature, recovery, messageHash }) => [...signature, recovery, messageHash],

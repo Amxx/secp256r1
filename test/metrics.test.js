@@ -20,7 +20,7 @@ describe('gas metrics', function () {
   });
 
   for (const { contract, signature, args, skip } of  [{
-    contract: '$Secp256r1_reference',
+    contract: '$Secp256r1_itsobvioustech',
     signature: '$Verify',
     args: (publicKey, signature, digest) => [[...publicKey, "placeholder"], ...signature, digest],
   },{

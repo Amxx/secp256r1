@@ -4,6 +4,7 @@
   "author": "Hadrien Croubois (@Amxx)",
   "license": "MIT",
   "scripts": {
+    "clean": "hardhat clean",
     "compile": "hardhat compile",
     "test": "hardhat test"
   },

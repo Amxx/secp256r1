@@ -3,11 +3,15 @@ pragma solidity ^0.8.20;
 
 import { Math } from "./Math.sol";
 
-// Heavily inspired from
-// https://github.com/maxrobot/elliptic-solidity/blob/master/contracts/Secp256r1.sol
-// https://github.com/tdrerup/elliptic-curve-solidity/blob/master/contracts/curves/EllipticCurve.sol
-// and modified jacobian double
-// optimisations to avoid to an from from affine and jacobian coordinates
+/**
+ * @dev Implementation of secp256r1 verification and recovery functions.
+ *
+ * Based on
+ * - https://github.com/itsobvioustech/aa-passkeys-wallet/blob/main/src/Secp256r1.sol
+ * Which is heavily inspired from
+ * - https://github.com/maxrobot/elliptic-solidity/blob/master/contracts/Secp256r1.sol
+ * - https://github.com/tdrerup/elliptic-curve-solidity/blob/master/contracts/curves/EllipticCurve.sol
+ */
 library P256 {
     struct JPoint {
         uint256 x;

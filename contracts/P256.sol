@@ -35,7 +35,7 @@ library P256 {
      * @param e - hashed message
      */
     function verify(uint256 px, uint256 py, uint256 r, uint256 s, uint256 e) internal view returns (bool) {
-        if (r == 0 || r >= nn || s == 0 || s >= nn) return false;
+        if (r == 0 || r >= nn || s == 0 || s >= nn || !isOnCurve(px, py)) return false;
 
         JPoint[16] memory points = _preComputeJacobianPoints(px, py);
         uint256 w = _invModPrime(s, nn);
@@ -89,6 +89,18 @@ library P256 {
             }
         }
         return _affineFromJacobian(x, y, z);
+    }
+
+    /**
+     * @dev check if a point is on the curve.
+     */
+    function isOnCurve(uint256 x, uint256 y) internal pure returns (bool result) {
+        assembly {
+            let p := pp
+            let lhs := mulmod(y, y, p)
+            let rhs := addmod(mulmod(addmod(mulmod(x, x, p), a, p), x, p), b, p)
+            result := eq(lhs, rhs)
+        }
     }
 
     /**

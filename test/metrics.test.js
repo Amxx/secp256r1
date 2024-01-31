@@ -1,10 +1,9 @@
 const { ethers } = require('hardhat');
 const { expect } = require('chai');
-const { secp256r1 } = require('@noble/curves/p256');
 const { loadFixture } = require('@nomicfoundation/hardhat-network-helpers');
 const { prepareSignature } = require('./utils');
 
-const RUN_COUNT = 10;
+const COUNT = Number(process.env.COUNT ?? 10);
 
 describe('gas metrics', function () {
   before(async function () {
@@ -69,7 +68,7 @@ describe('gas metrics', function () {
         Object.assign(this, await loadFixture(fixture), prepareSignature());
       });
 
-      Array(RUN_COUNT).fill().forEach((_, i, {length}) => {
+      Array(COUNT).fill().forEach((_, i, {length}) => {
         it(`run ${i + 1}/${length}`, async function () {
           expect(await this.mock.getFunction(signature).staticCall(...args(this))).to.deep.equal(expected(this));
           this.metrics[key].push(await this.mock.getFunction(signature).estimateGas(...args(this)));

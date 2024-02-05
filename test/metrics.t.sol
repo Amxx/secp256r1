@@ -39,6 +39,10 @@ contract P256Impl {
     function recovery(bytes32 r, bytes32 s, uint8 v, bytes32 e) public view returns (uint256, uint256) {
         return P256.recovery(uint256(r), uint256(s), v, uint256(e));
     }
+
+    function recoveryAddress(bytes32 r, bytes32 s, uint8 v, bytes32 e) public view returns (address) {
+        return P256.recoveryAddress(uint256(r), uint256(s), v, uint256(e));
+    }
 }
 
 contract P256Test is Test {
@@ -65,7 +69,7 @@ contract P256Test is Test {
 
     function _run(uint256 privateKey, bytes32 digest) public {
         (uint256 Qx, uint256 Qy) = P256.getPublicKey(privateKey);
-        address Qa = address(uint160(uint256(keccak256(abi.encodePacked(Qx, Qy)))));
+        address Qa = P256.getAddress(Qx, Qy);
         (bytes32 r, bytes32 s) = vm.signP256(privateKey, digest);
 
         // Check itsobvioustech
@@ -79,6 +83,8 @@ contract P256Test is Test {
         // Check FCL
         {
             assertTrue(fclimpl.verify(Qx, Qy, r, s, digest));
+        }
+        {
             address Qa0 = fclimpl.recovery(r, s, 0, digest);
             address Qa1 = fclimpl.recovery(r, s, 1, digest);
             assertTrue(Qa == Qa0 || Qa == Qa1);
@@ -86,9 +92,16 @@ contract P256Test is Test {
         // Check P256
         {
             assertTrue(p256impl.verify(Qx, Qy, r, s, digest));
+        }
+        {
             (uint256 Qx0, uint256 Qy0) = p256impl.recovery(r, s, 0, digest);
             (uint256 Qx1, uint256 Qy1) = p256impl.recovery(r, s, 1, digest);
             assertTrue((Qx0 == Qx && Qy0 == Qy) || (Qx1 == Qx && Qy1 == Qy));
+        }
+        {
+            address Qa0 = p256impl.recoveryAddress(r, s, 0, digest);
+            address Qa1 = p256impl.recoveryAddress(r, s, 1, digest);
+            assertTrue(Qa == Qa0 || Qa == Qa1);
         }
     }
 }

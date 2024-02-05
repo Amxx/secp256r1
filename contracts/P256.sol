@@ -31,16 +31,16 @@ library P256 {
 
     /**
      * @dev signature verification
-     * @param px - public key coordinate X
-     * @param py - public key coordinate Y
+     * @param Qx - public key coordinate X
+     * @param Qy - public key coordinate Y
      * @param r - signature half R
      * @param s - signature half S
      * @param e - hashed message
      */
-    function verify(uint256 px, uint256 py, uint256 r, uint256 s, uint256 e) internal view returns (bool) {
-        if (r == 0 || r >= nn || s == 0 || s >= nn || !isOnCurve(px, py)) return false;
+    function verify(uint256 Qx, uint256 Qy, uint256 r, uint256 s, uint256 e) internal view returns (bool) {
+        if (r == 0 || r >= nn || s == 0 || s >= nn || !isOnCurve(Qx, Qy)) return false;
 
-        JPoint[16] memory points = _preComputeJacobianPoints(px, py);
+        JPoint[16] memory points = _preComputeJacobianPoints(Qx, Qy);
         uint256 w = _invModN(s);
         uint256 u1 = mulmod(e, w, nn);
         uint256 u2 = mulmod(r, w, nn);
@@ -73,12 +73,38 @@ library P256 {
     }
 
     /**
+     * @dev address recovery
+     * @param r - signature half R
+     * @param s - signature half S
+     * @param v - signature recovery param
+     * @param e - hashed message
+     */
+    function recoveryAddress(uint256 r, uint256 s, uint8 v, uint256 e) internal view returns (address) {
+        (uint256 Qx, uint256 Qy) = recovery(r, s, v, e);
+        return getAddress(Qx, Qy);
+    }
+
+    /**
      * @dev derivate public key
      * @param privateKey - private key
      */
     function getPublicKey(uint256 privateKey) internal view returns (uint256, uint256) {
         (uint256 x, uint256 y, uint256 z) = _jMult(gx, gy, 1, privateKey);
         return _affineFromJacobian(x, y, z);
+    }
+
+    /**
+     * @dev Hash public key into an address
+     * @param Qx - public key coordinate X
+     * @param Qy - public key coordinate Y
+     */
+    function getAddress(uint256 Qx, uint256 Qy) internal pure returns (address result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(0x00, Qx)
+            mstore(0x20, Qy)
+            result := keccak256(0x00, 0x40)
+        }
     }
 
     /**
